@@ -16,3 +16,4 @@ A blank repository for the HDI 2020 intern work
 	- `git merge <the name of your branch` - combine your branch changes with those in the repository
 	- optional: `git branch -d <the name of your branch>` - delete the branch if you're done with it
 	- `git push` - send your updated local copy to the upstream repo
+4. Remember, if git gets annoying https://en.wikipedia.org/wiki/Git#Naming
