@@ -15,6 +15,7 @@ cols = ['Age at visit (years) [EUPATH_0000113]',
 df['Visit date [EUPATH_0000091]'] = pd.to_datetime(df['Visit date [EUPATH_0000091]'])
 start_date = min(df['Visit date [EUPATH_0000091]']) 
 end_date = max(df['Visit date [EUPATH_0000091]'])
+print('|| Start: ', start_date, ' || End: ', end_date, ' || Duration in days: ', duration_days)
 
 
 
@@ -26,4 +27,4 @@ for id in ids[:1]:
 	padded_dfs.append(pad(df, id, cols, start_date, end_date))
 
 pdf_head = pd.concat(padded_dfs)
-pdf_head.to_csv('padded_demo__.csv', index = False)
+pdf_head.to_csv('padded_demo.csv', index = False)
