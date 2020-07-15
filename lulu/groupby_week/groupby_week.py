@@ -26,15 +26,17 @@ df = df.set_index(index)
 df = df.drop(columns=['Participant_Id', 'Visit week'])
 df['counts'] = df.groupby(level=['Participant_Id', 'Visit week']).size()
 # print(df) # just to check
-print('Most number of visits per week by a single participant: ', str(max(df['counts'])))
+# print('Most number of visits per week by a single participant: ', str(max(df['counts'])))
 # print(df.apply(pd.value_counts))
 # print(df['counts'].tolist()) # just to check the groupby is sensible
 
 ## Visualise dist of number of visits per week as table and as bar chart: -------------------------------------------------------
 df['counts'] = pd.Categorical(df.counts) # make counts categorical
-count_freqs = df['counts'].value_counts()
-print('Instances of each number of visits per week (e.g. an individual who has 2 weeks with 3 visits adds 2 counts to the 3rd row of table: ')
-print(count_freqs)
+count_freqs = df['counts'].value_counts().tolist()
+count_freqs[1] = count_freqs[1]/2
+count_freqs[2] = count_freqs[2]/3
+print('Instances of each number of visits per week (e.g. an individual who has 2 weeks with 3 visits adds 2 instances to the 3rd row of table): ')
+#print(count_freqs)
 
 ax = plt.subplot()
 plt.bar([1,2,3], count_freqs)
