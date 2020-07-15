@@ -1,0 +1,5 @@
+Most number of visits per week by a single participant:  3
+Instances of each number of visits per week (e.g. an individual who has 2 weeks with 3 visits adds 2 counts to the 3rd row of table: 
+1    46750
+2     1956
+3       15
