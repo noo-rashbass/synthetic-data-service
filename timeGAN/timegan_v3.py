@@ -1,6 +1,7 @@
 import tensorflow as tf 
+print(tf.__version__)
 import numpy as np
-from utils3 import extract_time, rnn_cell 
+from utils3 import extract_time, rnn_cell, random_generator, batch_generator
 
 def timegan(ori_data, parameters):
     
@@ -80,11 +81,12 @@ def timegan(ori_data, parameters):
         embedder_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
         H = embedder_model(X, T)
-        #print(embedder_model.summary())
+        print(embedder_model.summary())
         e_vars = (embedder_model.trainable_variables)
         #the e_vars shape originally is sometimes (24, 48) but mine has (12, 48) two times, not sure if this makes a big diff??
 
         return H, e_vars
+
 
     def recovery (H, T):   
         """Recovery network from latent space to original space.
@@ -189,7 +191,7 @@ def timegan(ori_data, parameters):
     # Variables      
     # not sure adding is right
     # original code seems to only have one set of variables for each type of model
-    # i get one sets each time the same model is called?? 
+    # i get one set each time the same model is called?? 
     e_vars_all = e_vars
     r_vars_all = r_vars_1 + r_vars_2 
     g_vars_all = g_vars
@@ -198,25 +200,100 @@ def timegan(ori_data, parameters):
 
     # Discriminator loss
     # y fake, y real, y fake e all comes from discriminator
-    # discriminator does not hv activation fn, so with logits for loss fn should be right?
-    #or should we use keras loss?
-    D_loss_real = tf.nn.sigmoid_cross_entropy_with_logits(tf.ones_like(Y_real), Y_real) #loss for cls of latent real data seq
-    D_loss_fake = tf.nn.sigmoid_cross_entropy_with_logits(tf.zeros_like(Y_fake), Y_fake) #loss for cls of latent synthethic data seq
-    D_loss_fake_e = tf.nn.sigmoid_cross_entropy_with_logits(tf.zeros_like(Y_fake_e), Y_fake_e) #loss for cls of latent synthetic data
+    # discriminator does not hv activation fn, so from_logits= True?
+    #ori D_loss uses reduction SUM_BY_NONZERO_WEIGHTS, not sure if I should use AUTO or SUM_OVER_BATCH_SIZE or sth else
+    #https://stackoverflow.com/questions/48418692/does-sigmoid-cross-entropy-produce-the-mean-loss-over-the-whole-batch
+    bce = tf.keras.losses.BinaryCrossentropy(from_logits=True) #loss for cls of latent real data seq
+    #default arg for tf.keras.losses.BinaryCrossentropy reduction=losses_utils.ReductionV2.AUTO
+    D_loss_real = bce(tf.ones_like(Y_real), Y_real)
+    D_loss_fake = bce(tf.zeros_like(Y_fake), Y_fake) #loss for cls of latent synthethic data seq
+    D_loss_fake_e = bce(tf.zeros_like(Y_fake_e), Y_fake_e) #loss for cls of latent synthetic data
     D_loss = D_loss_real + D_loss_fake + gamma * D_loss_fake_e
 
     # Generator loss
     # 1. Adversarial loss
-    G_loss_U = tf.nn.sigmoid_cross_entropy_with_logits(tf.ones_like(Y_fake), Y_fake) ##unsupervised (eq8)
-    G_loss_U_e = tf.nn.sigmoid_cross_entropy_with_logits(tf.ones_like(Y_fake_e), Y_fake_e)
+    G_loss_U = bce(tf.ones_like(Y_fake), Y_fake) ##unsupervised (eq8)
+    G_loss_U_e = bce(tf.ones_like(Y_fake_e), Y_fake_e)
     
     # 2. Supervised loss
-    #should it be with keras?
-    #G_loss_S = tf.keras.losses.MeanSquaredError(H[:,1:,:], H_hat_supervise[:,:-1,:]) ##supervised loss (eq9) #loss for time series
+    mse = tf.keras.losses.MeanSquaredError() #default: reduction=losses_utils.ReductionV2.AUTO
+    #same as above, reduction method might be diff?
+    G_loss_S = mse(H[:,1:,:], H_hat_supervise[:,:-1,:]) ##supervised loss (eq9) #loss for time series
     
     # 3. Two Momments
-    #G_loss_V1 = tf.reduce_mean(tf.abs(tf.sqrt(tf.nn.moments(X_hat,[0])[1] + 1e-6) - tf.sqrt(tf.nn.moments(X,[0])[1] + 1e-6)))
-    #G_loss_V2 = tf.reduce_mean(tf.abs((tf.nn.moments(X_hat,[0])[0]) - (tf.nn.moments(X,[0])[0])))
+    G_loss_V1 = tf.reduce_mean(tf.abs(tf.sqrt(tf.nn.moments(X_hat,[0])[1] + 1e-6) - tf.sqrt(tf.nn.moments(X,[0])[1] + 1e-6)))
+    G_loss_V2 = tf.reduce_mean(tf.abs((tf.nn.moments(X_hat,[0])[0]) - (tf.nn.moments(X,[0])[0])))
+
+    G_loss_V = G_loss_V1 + G_loss_V2 ##moment matching loss to improve diversity of generated sample
+
+    # 4. Summation
+    G_loss = G_loss_U + gamma * G_loss_U_e + 100 * tf.sqrt(G_loss_S) + 100*G_loss_V
+
+    # Embedder network loss
+    E_loss_T0 = mse(X, X_tilde) ##reconstruction loss
+    E_loss0 = 10*tf.sqrt(E_loss_T0)
+    E_loss = E_loss0  + 0.1*G_loss_S
+
+    def discriminator_loss(Y_real, Y_fake, Y_fake_e, gamma=gamma):
+        bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        D_loss_real = bce(tf.ones_like(Y_real), Y_real)
+        D_loss_fake = bce(tf.zeros_like(Y_fake), Y_fake)
+        D_loss_fake_e = bce(tf.zeros_like(Y_fake_e), Y_fake_e)
+        D_loss = D_loss_real + D_loss_fake + gamma * D_loss_fake_e
+        return D_loss
+
+    def generator_loss(Y_fake, H, X_hat, X, gamma=gamma):
+        mse = tf.keras.losses.MeanSquaredError() 
+        G_loss_S = mse(H[:,1:,:], H_hat_supervise[:,:-1,:]) ##supervised loss (eq9) #loss for time series
+    
+        G_loss_V1 = tf.reduce_mean(tf.abs(tf.sqrt(tf.nn.moments(X_hat,[0])[1] + 1e-6) - tf.sqrt(tf.nn.moments(X,[0])[1] + 1e-6)))
+        G_loss_V2 = tf.reduce_mean(tf.abs((tf.nn.moments(X_hat,[0])[0]) - (tf.nn.moments(X,[0])[0])))
+
+        G_loss_V = G_loss_V1 + G_loss_V2 ##moment matching loss to improve diversity of generated sample
+        
+        G_loss = G_loss_U + gamma * G_loss_U_e + 100 * tf.sqrt(G_loss_S) + 100*G_loss_V
+        return G_loss
+
+    def generator_s_loss(Y_fake, H, X_hat, X, gamma=gamma):
+        mse = tf.keras.losses.MeanSquaredError() 
+        G_loss_S = mse(H[:,1:,:], H_hat_supervise[:,:-1,:])
+        return G_loss_S
+
+    def embedder_0_loss(X, X_tilde, H):
+        #should we compute G_loss_S again?
+        mse = tf.keras.losses.MeanSquaredError() 
+        G_loss_S = mse(H[:,1:,:], H_hat_supervise[:,:-1,:])
+
+        E_loss_T0 = mse(X, X_tilde) ##reconstruction loss
+        E_loss0 = 10*tf.sqrt(E_loss_T0)
+        #E_loss = E_loss0  + 0.1*G_loss_S
+        return E_loss0
+
+    # optimizer
+    embedder_optimizer = tf.keras.optimizers.Adam()
+
+    #for itt in range(iterations):
+        # Set mini-batch
+        #X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)
+
+    @tf.function
+    def train_step_embedder(X_mb, T_mb):
+
+        with tf.GradientTape() as embedder_tape:
+            H_mb, e_vars_mb = embedder(X_mb, T_mb)
+            X_tilde_mb, r_vars_mb = recovery(H_mb, T_mb)
+
+            embedder_0_loss = embedder_0_loss(X_mb, X_tilde_mb, H_mb)
+            gradients_of_embedder = embedder_tape.gradient(embedder_0_loss, e_vars_mb)
+            embedder_optmizer.apply_gradients(zip(gradients_of_embedder, e_vars_mb))
+    
+    def train():
+        for itt in range(iterations):
+            X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size) 
+            print(X_mb, T_mb)
+            train_step_embedder(X_mb, T_mb)
+            print(itt)
+    #train()
 
 ####TESTING####
 
@@ -240,7 +317,7 @@ parameters = dict()
 parameters['module'] = 'lstm' 
 parameters['hidden_dim'] = 6
 parameters['num_layer'] = 3
-parameters['iterations'] = 100
-parameters['batch_size'] = 128
+parameters['iterations'] = 10
+parameters['batch_size'] = 4
 
 timegan(ori_data, parameters)
