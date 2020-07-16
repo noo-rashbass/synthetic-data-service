@@ -20,7 +20,8 @@ Note: Use original data as training set to generater synthetic data (time-series
 import tensorflow as tf
 import numpy as np
 from utils import extract_time, rnn_cell, random_generator, batch_generator
-
+import warnings
+warnings.filterwarnings("ignore")
 
 def timegan (ori_data, parameters):
   """TimeGAN function.
@@ -38,10 +39,10 @@ def timegan (ori_data, parameters):
 
   # Basic Parameters
   no, seq_len, dim = np.asarray(ori_data).shape
-    
-  # Maximum sequence length and each sequence length
+
+ # Maximum sequence length and each sequence length
   ori_time, max_seq_len = extract_time(ori_data)
-  
+
   def MinMaxScaler(data):
     """Min-Max Normalizer.
     
@@ -86,10 +87,11 @@ def timegan (ori_data, parameters):
       - H: embeddings
     """
     e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh) for _ in range(num_layers)])
+    print(e_cell.state_size)
     model = tf.keras.Sequential([
 
-            #tf.keras.layers.Embedding(24, 24, batch_input_shape=[batch_size, None]),
-                        
+            tf.keras.layers.Embedding(128, 12),
+                                   
             tf.keras.layers.RNN(e_cell, dtype=tf.float32), 
                        
             tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
@@ -200,45 +202,18 @@ def timegan (ori_data, parameters):
   Y_real = discriminator(H)     
   Y_fake_e = discriminator(E_hat)
     
-##  # Discriminator loss
-##  D_loss_real = tf.compat.v1.losses.sigmoid_cross_entropy(tf.ones_like(Y_real), Y_real)
-##  D_loss_fake = tf.compat.v1.losses.sigmoid_cross_entropy(tf.zeros_like(Y_fake), Y_fake)
-##  D_loss_fake_e = tf.compat.v1.losses.sigmoid_cross_entropy(tf.zeros_like(Y_fake_e), Y_fake_e)
-##  D_loss = D_loss_real + D_loss_fake + gamma * D_loss_fake_e
-##            
-##  # Generator loss
-##  # 1. Adversarial loss
-##  G_loss_U = tf.compat.v1.losses.sigmoid_cross_entropy(tf.ones_like(Y_fake), Y_fake)
-##  G_loss_U_e = tf.compat.v1.losses.sigmoid_cross_entropy(tf.ones_like(Y_fake_e), Y_fake_e)
-##    
-##  # 2. Supervised loss
-##  G_loss_S = tf.compat.v1.losses.mean_squared_error(H[:,1:,:], H_hat_supervise[:,:-1,:])
-##    
-##  # 3. Two Momments
-##  G_loss_V1 = tf.reduce_mean(input_tensor=tf.abs(tf.sqrt(tf.nn.moments(x=X_hat,axes=[0])[1] + 1e-6) - tf.sqrt(tf.nn.moments(x=X,axes=[0])[1] + 1e-6)))
-##  G_loss_V2 = tf.reduce_mean(input_tensor=tf.abs((tf.nn.moments(x=X_hat,axes=[0])[0]) - (tf.nn.moments(x=X,axes=[0])[0])))
-##    
-##  G_loss_V = G_loss_V1 + G_loss_V2
-##    
-##  # 4. Summation
-##  G_loss = G_loss_U + gamma * G_loss_U_e + 100 * tf.sqrt(G_loss_S) + 100*G_loss_V 
+
             
   # Embedder network loss
   def embed_obj(X, X_tilde):
     return 10*tf.sqrt(tf.compat.v1.losses.mean_squared_error(X, X_tilde))
   def E_loss_T0(X, X_tilde):
     return tf.compat.v1.losses.mean_squared_error(X, X_tilde)
-  #E_loss_T0 = tf.losses.mean_squared_error(X, X_tilde)
-  #E_loss0 = 10*tf.sqrt(E_loss_T0)
-  #E_loss = E_loss0  + 0.1*G_loss_S
+
     
   # optimizer
   EO_solver = tf.keras.optimizers.Adam()
-##  E0_solver = tf.compat.v1.train.AdamOptimizer().minimize(E_loss0, var_list = e_vars + r_vars)
-##  E_solver = tf.compat.v1.train.AdamOptimizer().minimize(E_loss, var_list = e_vars + r_vars)
-##  D_solver = tf.compat.v1.train.AdamOptimizer().minimize(D_loss, var_list = d_vars)
-##  G_solver = tf.compat.v1.train.AdamOptimizer().minimize(G_loss, var_list = g_vars + s_vars)      
-##  GS_solver = tf.compat.v1.train.AdamOptimizer().minimize(G_loss_S, var_list = g_vars + s_vars)   
+ 
         
   ## TimeGAN training   
     
@@ -247,17 +222,26 @@ def timegan (ori_data, parameters):
 
   for itt in range(iterations):
     # Set mini-batch
-    X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)           
-    # Train embedder        
-    H(X_mb, training=True)
-    EO_solver.minimize(embed_obj, var_list = H.trainable_variables + X_tilde.trainable_variables)
-  
 
-##    with tf.GradientTape() as embed_tape:
-##      embed_loss = embed_obj(X_mb, X_tilde)
-##      gradients_embed = embed_tape.gradient(embed_loss, H.trainable_variables)
-##      EO_solver.apply_gradients(zip(gradients_embed, H.trainable_variables))
-##      #step_e_loss = E_loss_T0(X_mb, T_mb)
+    #X_mb = ori_data
+
+    X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)
+    X_mb = np.reshape(X_mb, [batch_size, seq_len, -1])
+
+    
+    # Train embedder
+       
+   
+   
+    with tf.GradientTape() as embed_tape:
+      embed = H(X_mb)
+      recover = X_tilde(embed)
+      loss = emb_obj(X_mb, recover)
+      
+      
+      gradients_embed = embed_tape.gradient(loss, H.trainable_variables + X_tilde.trainable_variables)
+      EO_solver.apply_gradients(zip(gradients_embed, H.trainable_variables + X_tilde.trainable_variables))
+      
     # Checkpoint
     if itt % 1000 == 0:
       print('step: '+ str(itt) + '/' + str(iterations) + ', e_loss: ' + str(np.round(np.sqrt(step_e_loss),4)) ) 
@@ -332,3 +316,5 @@ def timegan (ori_data, parameters):
   generated_data = generated_data + min_val
     
   return generated_data
+
+
