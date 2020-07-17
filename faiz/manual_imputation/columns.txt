@@ -1,0 +1,32 @@
+participant ID and household ID stay the same
+abdominal pain - 'unable to assess', or yes if from future visit
+abdominal pain duration - 0 if unable to assess, compute from future visit duration otherwise
+admitting hospital - na
+age imputation in file
+anorexia - 'unable to assess', or yes if from future visit
+anorexia duration - 0 if unable to assess, compute from future visit duration otherwise
+asex plasmod density - NA
+asex plasmod present - NA if density NA, positive if density > 0
+basis of complicated diagnosis - NA
+complicated malaria - NA
+cough - 'unable to assess', or yes if from future visit
+cough duration - 0 if unable to assess, compute from future visit duration otherwise
+days since enrollment - NA outside range, calculate otherwise
+Diagnosis at hospitalization - NA
+diarrhoea - 'unable to assess', or yes if from future visit
+diarrhoea duration - 0 if unable to assess, compute from future visit otherwise
+fatigue - 'unable to assess', or yes if from future visit
+fatiue duration - 0 if unable to assess, compute from future visit otherwise
+febrile - 'unable to assess', or yes if from future visit
+febrile duration - 0 if unable to assess, compute from future visit otherwise
+headache - 'unable to assess', or yes if from future visit
+headache duration - 0 if unable to assess, compute from future visit otherwise
+height - TODO (no NA or unable to assess in data)
+haemoglobin - TODO, either NA or last or first value or linearly model (no unable to assess)
+hospital admission date - NA
+hospital discharge date - NA
+ITN last night - NA
+jaundice - 'unable to assess', or yes if from future visit
+jaundice duration - 0 if unable to assess, compute from future visit otherwise
+joint pains - 'unable to assess', or yes if from future visit
+joint pains duration - 0 if unable to assess, compute from future visit otherwise
