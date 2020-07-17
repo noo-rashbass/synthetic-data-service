@@ -38,8 +38,10 @@ while series_start_date < patient_start_date:
     series_start_date += delta
     series_start_age += 1/365
 
-column = "Malaria diagnosis [EUPATH_0000090]"
-diagnosis = data[["Observation_Id", "Participant_Id", column, 'Visit date [EUPATH_0000091]']].dropna()
+column = "Days since enrollment [EUPATH_0000191]"
+diagnosis = data[["Observation_Id", "Participant_Id", column, 'Visit date [EUPATH_0000091]']]
 print(diagnosis)
-print(diagnosis[diagnosis[column] == 'Unable to assess'])
 print(patient[["Observation_Id", "Participant_Id", column, 'Visit date [EUPATH_0000091]']])
+
+print(diagnosis[diagnosis[column].isnull()])
+print(diagnosis[column].unique())

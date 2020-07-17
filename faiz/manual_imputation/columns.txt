@@ -1,7 +1,7 @@
 participant ID and household ID stay the same
 abdominal pain - 'unable to assess', or yes if from future visit
 abdominal pain duration - 0 if unable to assess, compute from future visit duration otherwise
-admitting hospital - na
+admitting hospital - NA
 age imputation in file
 anorexia - 'unable to assess', or yes if from future visit
 anorexia duration - 0 if unable to assess, compute from future visit duration otherwise
@@ -21,7 +21,7 @@ febrile - 'unable to assess', or yes if from future visit
 febrile duration - 0 if unable to assess, compute from future visit otherwise
 headache - 'unable to assess', or yes if from future visit
 headache duration - 0 if unable to assess, compute from future visit otherwise
-height - TODO (no NA or unable to assess in data)
+height - TODO (maybe NA or extrapolate)
 haemoglobin - TODO, either NA or last or first value or linearly model (no unable to assess)
 hospital admission date - NA
 hospital discharge date - NA
@@ -30,3 +30,46 @@ jaundice - 'unable to assess', or yes if from future visit
 jaundice duration - 0 if unable to assess, compute from future visit otherwise
 joint pains - 'unable to assess', or yes if from future visit
 joint pains duration - 0 if unable to assess, compute from future visit otherwise
+malaria diagnosis - NA
+Malaria diagnosis and parasite status - 'Blood smear not indicated' 
+(TODO)                                  'Blood smear negative / LAMP not done'
+                                        'Blood smear negative / LAMP negative'
+                                        'Blood smear positive / no malaria'
+                                        'Symptomatic malaria'
+                                        'Blood smear negative / LAMP positive'
+                                        'Blood smear indicated but not done'
+                                        nan
+malaria treatment - no malaria medication given
+muscle aches - 'unable to assess', or yes if from future visit
+muscle aches duration - 0 if unable to assess, compute from future visit otherwise
+non-malaria medication - NA
+other diagnosis - NA
+other medical complaint - NA
+Plasmodium gametocytes present - NA
+seizures - 'unable to assess', or yes if from future visit
+seizures duration - 0 if unable to assess, compute from future visit otherwise
+severe malaria criteria - NA
+subjective fever - TODO: no, yes, NA
+Submicroscopic Plasmodium present - NA
+temperature - interpolate linearly between values, extend backwards and forwards
+visit date - incrementing by 1 every day from earliest start date to latest end date
+visit type - TODO (scheduled, unscheduled, NA)
+vomiting - 'unable to assess', or yes if from future visit
+vomiting duration - 0 if unable to assess, compute from future visit otherwise
+weight - linearly interpolate between values, TODO: what before and after?
+
+TODOS
+
+height - (maybe NA or extrapolate)
+haemoglobin - either NA or last or first value or linearly model (no unable to assess)
+Malaria diagnosis and parasite status - 'Blood smear not indicated' 
+(TODO)                                  'Blood smear negative / LAMP not done'
+                                        'Blood smear negative / LAMP negative'
+                                        'Blood smear positive / no malaria'
+                                        'Symptomatic malaria'
+                                        'Blood smear negative / LAMP positive'
+                                        'Blood smear indicated but not done'
+                                        nan
+subjective fever - no, yes, NA
+visit type - scheduled, unscheduled, NA
+weight - linearly interpolate between values, but what before and after?
