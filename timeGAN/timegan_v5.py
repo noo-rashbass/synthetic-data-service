@@ -179,7 +179,7 @@ def timegan(ori_data, parameters):
         discriminator_model = tf.keras.Sequential(name='discriminator')
         for i in range(num_layers):
             discriminator_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
-        discriminator_model.add(tf.keras.layers.Dense(dim, activation=None))
+        discriminator_model.add(tf.keras.layers.Dense(1, activation=None))
 
         # d_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
         # discriminator_model = tf.keras.Sequential([
