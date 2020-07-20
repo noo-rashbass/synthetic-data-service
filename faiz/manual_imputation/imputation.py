@@ -24,6 +24,7 @@ for patient_id in patients:
     patient = data[data['Participant_Id'] == patient_id].\
                         sort_values(['Visit date [EUPATH_0000091]']).reset_index(drop=True)
 
+    print(patient)
     # earliest start date
     series_start_date = minmax_time[0]
     
@@ -37,6 +38,7 @@ for patient_id in patients:
 
     observation_id = patient.iloc[0]['Observation_Id']
     imputed_obs_id = observation_id - day_difference
+    household_id = patient.iloc[0]['Household_Id']
     age = patient.iloc[0]["Age at visit (years) [EUPATH_0000113]"]
     current_age = age - day_difference/365
     current_date = series_start_date
@@ -116,7 +118,7 @@ for patient_id in patients:
             height = patient.iloc[0]['Age at visit (years) [EUPATH_0000113]']
 
         # averaging haemoglobin
-        haemoglobin = round(patient['Hemoglobin (g/dL) [EUPATH_0000047]'].mean(), 1))
+        haemoglobin = round(patient['Hemoglobin (g/dL) [EUPATH_0000047]'].mean(), 1)
         hospital_admission_date = np.nan
         hospital_discharge_date = np.nan
         itn = np.nan
@@ -136,14 +138,122 @@ for patient_id in patients:
         else:
             joint_pains = "Yes"
             joint_pains_duration -= day_difference     # make int when writing
-        
+
         malaria_diagnosis = np.nan
+        malaria_diagnosis_parasite_status = "Blood smear not indicated"
+        malaria_treatment = "No malaria medications given"
+
+        muscle_aches_duration = patient.iloc[0]['Muscle aches duration (days) [EUPATH_0000162]']
+        if muscle_aches_duration - day_difference < 0:
+            muscle_aches = "Unable to assess"
+            muscle_aches_duration = 0
+        else:
+            muscle_aches = "Yes"
+            muscle_aches_duration -= day_difference     # make int when writing
+
+        non_malaria_medication = np.nan
+        other_diagnosis = np.nan
+        other_medical_complaint = np.nan
+        plasmod_gametocytes_present = np.nan
+
+        seizures_duration = patient.iloc[0]['Seizures duration (days) [EUPATH_0000163]']
+        if seizures_duration - day_difference < 0:
+            seizures = "Unable to assess"
+            seizures_duration = 0
+        else:
+            seizures = "Yes"
+            seizures_duration -= day_difference     # make int when writing
+        
+        severe_malaria_criteria = np.nan
+        subjective_fever = np.nan
+        submic_plasmod_present = np.nan
+
+        temperature = round(patient['Temperature (C) [EUPATH_0000110]'].mean(), 1)
+        visit_date = current_date
+        visit_type = "Scheduled visit"
+
+        vomiting_duration = patient.iloc[0]['Seizures duration (days) [EUPATH_0000163]']
+        if vomiting_duration - day_difference < 0:
+            vomiting = "Unable to assess"
+            vomiting_duration = 0
+        else:
+            vomiting = "Yes"
+            vomiting_duration -= day_difference     # make int when writing
+
+        # weight NAN for children, averaging for adults
+        weight = np.nan
+        if current_age > 20:
+            weight = round(patient['Weight (kg) [EUPATH_0000732]'].mean(), 1)
+        
+        real = False
+        imputed_row = [
+            imputed_obs_id, 
+            patient_id,
+            household_id,
+            abd_pain,
+            abd_pain_duration,
+            admitting_hospital,
+            current_age,
+            anorexia,
+            anorexia_duration,
+            asex_plasmod_density,
+            asex_plasmod_present,
+            complex_diagnosis_basis,
+            complicated_malaria,
+            cough,
+            cough_duration,
+            days_since_enrollment,
+            diagnosis_at_hospital,
+            diarrhoea,
+            diarrhoea_duration,
+            fatigue,
+            fatigue_duration,
+            febrile,
+            febrile_duration,
+            headache,
+            headache_duration,
+            height,
+            haemoglobin,
+            hospital_admission_date,
+            hospital_discharge_date,
+            itn,
+            jaundice,
+            jaundice_duration,
+            joint_pains,
+            joint_pains_duration,
+            malaria_diagnosis,
+            malaria_diagnosis_parasite_status,
+            malaria_treatment,
+            muscle_aches,
+            muscle_aches_duration,
+            non_malaria_medication,
+            other_diagnosis,
+            other_medical_complaint,
+            plasmod_gametocytes_present,
+            seizures,
+            seizures_duration,
+            severe_malaria_criteria,
+            subjective_fever,
+            submic_plasmod_present,
+            temperature,
+            visit_date,
+            visit_type,
+            vomiting,
+            vomiting_duration,
+            weight,
+            real
+        ]
+
+        patient = patient.append(imputed_row)
+        print(patient[['Participant_Id', 'Visit date [EUPATH_0000091]']])
 
         imputed_obs_id += 1
         current_age += 1/365
 
         current_date += delta
         day_difference -= 1
+
+        break
 
     break
 

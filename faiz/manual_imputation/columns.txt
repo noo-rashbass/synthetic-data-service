@@ -22,7 +22,7 @@ febrile duration - 0 if unable to assess, compute from future visit otherwise
 headache - 'unable to assess', or yes if from future visit
 headache duration - 0 if unable to assess, compute from future visit otherwise
 height - TODO (maybe NA or extrapolate)
-haemoglobin - NA
+haemoglobin - linerarly interpolate between values, otherwise averageing
 hospital admission date - NA
 hospital discharge date - NA
 ITN last night - NA
@@ -56,7 +56,7 @@ visit date - incrementing by 1 every day from earliest start date to latest end 
 visit type - scheduled
 vomiting - 'unable to assess', or yes if from future visit
 vomiting duration - 0 if unable to assess, compute from future visit otherwise
-weight - linearly interpolate between values, TODO: what before and after?
+weight - linearly interpolate between values, otherwise averaging
 
 TODOS
 
