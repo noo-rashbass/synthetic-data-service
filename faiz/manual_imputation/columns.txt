@@ -16,7 +16,7 @@ Diagnosis at hospitalization - NA
 diarrhoea - 'unable to assess', or yes if from future visit
 diarrhoea duration - 0 if unable to assess, compute from future visit otherwise
 fatigue - 'unable to assess', or yes if from future visit
-fatiue duration - 0 if unable to assess, compute from future visit otherwise
+fatigue duration - 0 if unable to assess, compute from future visit otherwise
 febrile - 'unable to assess', or yes if from future visit
 febrile duration - 0 if unable to assess, compute from future visit otherwise
 headache - 'unable to assess', or yes if from future visit

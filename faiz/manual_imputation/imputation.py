@@ -77,14 +77,73 @@ for patient_id in patients:
 
         days_since_enrollment = np.nan
         diagnosis_at_hospital = np.nan
+
+        diarrhoea_duration = patient.iloc[0]['Diarrhea duration (days) [EUPATH_0000157]']
+        if diarrhoea_duration - day_difference < 0:
+            diarrhoea = "Unable to assess"
+            diarrhoea_duration = 0
+        else:
+            diarrhoea = "Yes"
+            diarrhoea_duration -= day_difference     # make int when writing
         
+        fatigue_duration = patient.iloc[0]['Fatigue duration (days) [EUPATH_0000158]']
+        if fatigue_duration - day_difference < 0:
+            fatigue = "Unable to assess"
+            fatigue_duration = 0
+        else:
+            fatigue = "Yes"
+            fatigue_duration -= day_difference     # make int when writing
+        
+        febrile_duration = patient.iloc[0]['Fever, subjective duration (days) [EUPATH_0000164]']
+        if febrile_duration - day_difference < 0:
+            febrile = "Unable to assess"
+            febrile_duration = 0
+        else:
+            febrile = "Yes"
+            febrile_duration -= day_difference     # make int when writing
+
+        headache_duration = patient.iloc[0]['Headache duration (days) [EUPATH_0000159]']
+        if headache_duration - day_difference < 0:
+            headache = "Unable to assess"
+            headache_duration = 0
+        else:
+            headache = "Yes"
+            headache_duration -= day_difference     # make int when writing
+        
+        # set height as NAN for children and constant for adults (may change for children in the future)
+        height = np.nan
+        if current_age > 20:
+            height = patient.iloc[0]['Age at visit (years) [EUPATH_0000113]']
+
+        # averaging haemoglobin
+        haemoglobin = round(patient['Hemoglobin (g/dL) [EUPATH_0000047]'].mean(), 1))
+        hospital_admission_date = np.nan
+        hospital_discharge_date = np.nan
+        itn = np.nan
+
+        jaundice_duration = patient.iloc[0]['Jaundice duration (days) [EUPATH_0000160]']
+        if jaundice_duration - day_difference < 0:
+            jaundice = "Unable to assess"
+            jaundice_duration = 0
+        else:
+            jaundice = "Yes"
+            jaundice_duration -= day_difference     # make int when writing
+
+        joint_pains_duration = patient.iloc[0]['Joint pains duration (days) [EUPATH_0000161]']
+        if joint_pains_duration - day_difference < 0:
+            joint_pains = "Unable to assess"
+            joint_pains_duration = 0
+        else:
+            joint_pains = "Yes"
+            joint_pains_duration -= day_difference     # make int when writing
+        
+        malaria_diagnosis = np.nan
 
         imputed_obs_id += 1
         current_age += 1/365
 
         current_date += delta
         day_difference -= 1
-
 
     break
 
