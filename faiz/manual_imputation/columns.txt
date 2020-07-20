@@ -22,7 +22,7 @@ febrile duration - 0 if unable to assess, compute from future visit otherwise
 headache - 'unable to assess', or yes if from future visit
 headache duration - 0 if unable to assess, compute from future visit otherwise
 height - TODO (maybe NA or extrapolate)
-haemoglobin - TODO, either NA or last or first value or linearly model (no unable to assess)
+haemoglobin - NA
 hospital admission date - NA
 hospital discharge date - NA
 ITN last night - NA
@@ -53,7 +53,7 @@ subjective fever - TODO: no, yes, NA
 Submicroscopic Plasmodium present - NA
 temperature - interpolate linearly between values, extend backwards and forwards
 visit date - incrementing by 1 every day from earliest start date to latest end date
-visit type - TODO (scheduled, unscheduled, NA)
+visit type - scheduled
 vomiting - 'unable to assess', or yes if from future visit
 vomiting duration - 0 if unable to assess, compute from future visit otherwise
 weight - linearly interpolate between values, TODO: what before and after?
@@ -61,7 +61,6 @@ weight - linearly interpolate between values, TODO: what before and after?
 TODOS
 
 height - (maybe NA or extrapolate)
-haemoglobin - either NA or last or first value or linearly model (no unable to assess)
 Malaria diagnosis and parasite status - 'Blood smear not indicated' 
 (TODO)                                  'Blood smear negative / LAMP not done'
                                         'Blood smear negative / LAMP negative'
@@ -71,5 +70,4 @@ Malaria diagnosis and parasite status - 'Blood smear not indicated'
                                         'Blood smear indicated but not done'
                                         nan
 subjective fever - no, yes, NA
-visit type - scheduled, unscheduled, NA
 weight - linearly interpolate between values, but what before and after?
