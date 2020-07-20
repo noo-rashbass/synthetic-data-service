@@ -57,7 +57,7 @@ def extract_time (data):
   return time, max_seq_len
 
 
-def rnn_cell(module_name, hidden_dim, return_sequences=False):
+def rnn_cell(module_name, hidden_dim, return_sequences=False, input_shape=None):
   """Basic RNN Cell.
     
   Args:
@@ -70,10 +70,10 @@ def rnn_cell(module_name, hidden_dim, return_sequences=False):
   
   # GRU
   if (module_name == 'gru'):
-    rnn_cell = tf.keras.layers.GRU(units=hidden_dim, activation='tanh', return_sequences=return_sequences)
+    rnn_cell = tf.keras.layers.GRU(units=hidden_dim, activation='tanh', return_sequences=return_sequences, input_shape = input_shape)
   # LSTM
   elif (module_name == 'lstm'):
-    rnn_cell = tf.keras.layers.LSTM(units=hidden_dim, activation='tanh', return_sequences=return_sequences)
+    rnn_cell = tf.keras.layers.LSTM(units=hidden_dim, activation='tanh', return_sequences=return_sequences, input_shape = input_shape)
   # LSTM Layer Normalization
   elif (module_name == 'lstmLN'): #not exactly sure how to change this
     rnn_cell = tf.keras.layers.LSTM(units=hidden_dim, activation='tanh', return_sequences=return_sequences)
@@ -101,7 +101,7 @@ def random_generator (batch_size, z_dim, T_mb, max_seq_len):
     temp_Z = np.random.uniform(0., 1, [T_mb[i], z_dim])
     temp[:T_mb[i],:] = temp_Z
     Z_mb.append(temp_Z)
-  return Z_mb
+  return np.array(Z_mb)
 
 
 def batch_generator(data, time, batch_size):
@@ -116,11 +116,12 @@ def batch_generator(data, time, batch_size):
     - X_mb: time-series data in each batch
     - T_mb: time information in each batch
   """
+
   no = len(data)
   idx = np.random.permutation(no)
   train_idx = idx[:batch_size]     
             
-  X_mb = list(data[i] for i in train_idx)
-  T_mb = list(time[i] for i in train_idx)
+  X_mb = np.array([data[i] for i in train_idx])
+  T_mb = np.array([time[i] for i in train_idx])
   
   return X_mb, T_mb
