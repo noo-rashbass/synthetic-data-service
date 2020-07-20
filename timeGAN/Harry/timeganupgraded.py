@@ -134,9 +134,9 @@ def timegan (ori_data, parameters):
     e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh) for _ in range(num_layers)])
     model = tf.keras.Sequential([
                                     
-            tf.keras.layers.RNN(e_cell, dtype=tf.float32),
+            tf.keras.layers.RNN(e_cell, return_sequences=True),
                        
-            tf.keras.layers.Dense(dim, activation=tf.nn.sigmoid)
+            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
 
           ])
 
@@ -155,9 +155,9 @@ def timegan (ori_data, parameters):
     e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh) for _ in range(num_layers-1)])
     model = tf.keras.Sequential([
                        
-            tf.keras.layers.RNN(e_cell, H, dtype=tf.float32),
+            tf.keras.layers.RNN(e_cell, H),
                        
-            tf.keras.layers.Dense(dim, activation=tf.nn.sigmoid)
+            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
 
           ])
 
@@ -209,20 +209,31 @@ def timegan (ori_data, parameters):
   def E_loss_T0(X, X_tilde):
     return tf.compat.v1.losses.mean_squared_error(X, X_tilde)
 
+
+  #Supervised loss
+  def supervised_obj(H, H_hat_supervise):
+    return tf.compat.v1.losses.mean_squared_error(H[:,1:,:], H_hat_supervise[:,:-1,:])
+
+  #Generator loss
+  def generator_obj(G_loss_U, G_loss_U_e, G_loss_S, G_loss_V):
+    return G_loss_U + gamma * G_loss_U_e + 100 * tf.sqrt(G_loss_S) + 100*G_loss_V 
+  
+  #Discriminator loss
+  def discriminator_obj(Y_real, Y_fake, Y_fake_e):
+    D_loss_real = tf.compat.v1.losses.sigmoid_cross_entropy(tf.ones_like(Y_real), Y_real)
+    D_loss_fake = tf.compat.v1.losses.sigmoid_cross_entropy(tf.zeros_like(Y_fake), Y_fake)
+    D_loss_fake_e = tf.compat.v1.losses.sigmoid_cross_entropy(tf.zeros_like(Y_fake_e), Y_fake_e)
+    return D_loss_real + D_loss_fake + gamma * D_loss_fake_e
     
   # optimizer
   EO_solver = tf.keras.optimizers.Adam()
- 
-        
-  ## TimeGAN training   
-    
-  # 1. Embedding network training
-  print('Start Embedding Network Training')
+  GS_solver = tf.keras.optimizers.Adam() 
+  G_solver = tf.keras.optimizers.Adam()
+  E_solver = tf.keras.optimizers.Adam()
+  D_solver = tf.keras.optimizers.Adam()
 
-  
-    
-    
-    # Train embedder
+
+  # Train embedder
   @tf.function
   def train_step(X_mb):
     with tf.GradientTape() as embed_tape:
@@ -233,10 +244,104 @@ def timegan (ori_data, parameters):
       EO_solver.apply_gradients(zip(gradients_embed, H.trainable_variables + X_tilde.trainable_variables))
       step_e_loss = E_loss_T0(X_mb, recover)
       return step_e_loss
+
+  #Tensorflow 1 code was confusing so this is likely to be wrong.
+  @tf.function
+  def train_step_supervised(X_mb, Z_mb):
+    with tf.GradientTape() as supervised_tape:
+      embed = H(Z_mb)
+      generated = E_hat(embed)
+      supervisor = H_hat_supervise(generated)
+      
+      
+      loss = supervised_obj(embed, supervisor)
+
+      gradients_supervised = supervised_tape.gradient(loss, E_hat.trainable_variables + H_hat_supervise.trainable_variables)  
+      GS_solver.apply_gradients(zip(gradients_supervised, E_hat.trainable_variables + H_hat_supervise.trainable_variables))
+
+      
+      return loss
+
+  
+
+  #Generator is supposed to take it's own previous generated data as input.
+  @tf.function
+  def train_step_generator(X_mb, Z_mb):
+    with tf.GradientTape() as gen_tape:
+      
+      ##Not sure about feeding the generator embedded
+      embed = H(Z_mb)
+      generator = E_hat(embed)
+      supervisor = H_hat(generator)
+      Y_fake_mb = Y_fake(supervisor)
+      Y_fake_e_mb = Y_fake_e(generator)
+
+      X_hat_mb = X_hat(supervisor)
+
+      _supervisor = H_hat_supervise(embed)
+      
+      G_loss_U = tf.compat.v1.losses.sigmoid_cross_entropy(tf.ones_like(Y_fake_mb), Y_fake_mb)
+      G_loss_U_e = tf.compat.v1.losses.sigmoid_cross_entropy(tf.ones_like(Y_fake_e_mb), Y_fake_e_mb)
+      G_loss_S = supervised_obj(embed, _supervisor)
+
+      G_loss_V1 = G_loss_V1 = tf.reduce_mean(tf.abs(tf.sqrt(tf.nn.moments(X_hat_mb,[0])[1] + 1e-6) - tf.sqrt(tf.nn.moments(X_mb,[0])[1] + 1e-6)))
+      G_loss_V2 = G_loss_V2 = tf.reduce_mean(tf.abs((tf.nn.moments(X_hat_mb,[0])[0]) - (tf.nn.moments(X_mb,[0])[0])))
+      G_loss_V = G_loss_V1 + G_loss_V2
+      
+
+      loss = generator_obj(G_loss_U, G_loss_U_e, G_loss_S, G_loss_V)
+
+      gradients_generator = gen_tape.gradient(loss, E_hat.trainable_variables + H_hat_supervise.trainable_variables + H_hat_supervise.trainable_variables)  
+      GS_solver.apply_gradients(zip(gradients_generator, E_hat.trainable_variables + H_hat_supervise.trainable_variables + H_hat_supervise.trainable_variables))
+      
+
+      return G_loss_U, G_loss_S, G_loss_V
+  @tf.function
+  def train_step_joint_embed(X_mb, Z_mb):
+    with tf.GradientTape() as embed_tape:
+      embed = H(X_mb)
+      supervisor = H_hat_supervise(embed)
+           
+      G_loss_S = supervised_obj(embed, supervisor)
+
+      
+      recover = X_tilde(embed)
+      E_loss0 = embed_obj(X_mb, recover)
+      
+      loss = E_loss0  + 0.1*G_loss_S
+
+      gradients_embed = embed_tape.gradient(loss, H.trainable_variables + X_tilde.trainable_variables)  
+      GS_solver.apply_gradients(zip(gradients_embed, H.trainable_variables + X_tilde.trainable_variables))
+
+      return tf.losses.mean_squared_error(X_mb, recover)
+
+
+  @tf.function
+  def train_step_discriminator(X_mb, Z_mb):
+    with tf.GradientTape() as discrim_tape:
+      # Check discriminator loss before updating
+      embed = H(X_mb)
+      real = Y_real(embed)
+
+      generator = E_hat(embed)
+      supervisor = H_hat(generator)
+      fake = Y_fake(supervisor)
+
+      fake_e = Y_fake_e(generator)
+      loss = discriminator_obj(real, fake, fake_e)
+      if (loss > 0.15):
+        gradients_discrim = discrim_tape.gradient(loss, Y_fake.trainable_variables + Y_fake_e.trainable_variables + Y_real.trainable_variables)  
+        GS_solver.apply_gradients(zip(gradients_discrim, Y_fake.trainable_variables + Y_fake_e.trainable_variables + Y_real.trainable_variables))
+      return loss      
     
+ ## TimeGAN training   
     
+  # 1. Embedding network training
+  print('Start Embedding Network Training')
+      
   def train():
-    for itt in range(iterations):
+    for itt in range(1):
+      pass
       # Set mini-batch
 
       #X_mb = ori_data
@@ -248,78 +353,84 @@ def timegan (ori_data, parameters):
       # Checkpoint
       if itt % 1000 == 0:
         print('step: '+ str(itt) + '/' + str(iterations) + ', e_loss: ' + str(np.round(np.sqrt(step_e_loss),4))) 
-            
+    print('Finish Embedding Network Training')
+
+    # 2. Training only with supervised loss
+    print('Start Training with Supervised Loss Only')
     
-  train()
-      
-  print('Finish Embedding Network Training')
-    
-  # 2. Training only with supervised loss
-  print('Start Training with Supervised Loss Only')
-    
-  for itt in range(iterations):
-    # Set mini-batch
-    X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)    
-    # Random vector generation   
-    Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
-    # Train generator       
-    _, step_g_loss_s = sess.run([GS_solver, G_loss_S], feed_dict={Z: Z_mb, X: X_mb, T: T_mb})       
-    # Checkpoint
-    if itt % 1000 == 0:
-      print('step: '+ str(itt)  + '/' + str(iterations) +', s_loss: ' + str(np.round(np.sqrt(step_g_loss_s),4)) )
-      
-  print('Finish Training with Supervised Loss Only')
-    
-  # 3. Joint Training
-  print('Start Joint Training')
   
-  for itt in range(iterations):
-    # Generator training (twice more than discriminator training)
-    for kk in range(2):
+    for itt in range(1): 
       # Set mini-batch
-      X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)               
+      X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)    
+      # Random vector generation   
+      Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
+      # Train generator       
+      step_g_loss_s = train_step_supervised(X_mb, Z_mb)     
+      # Checkpoint
+      if itt % 1000 == 0:
+        print('step: '+ str(itt)  + '/' + str(iterations) +', s_loss: ' + str(np.round(np.sqrt(step_g_loss_s),4)) )
+
+    print('Finish Training with Supervised Loss Only')
+    
+    # 3. Joint Training
+    print('Start Joint Training')
+    
+    for itt in range(1):
+      # Generator training (twice more than discriminator training)
+      for kk in range(2):
+        # Set mini-batch
+        X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)               
+        # Random vector generation
+        Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
+        # Train generator
+        step_g_loss_u, step_g_loss_s, step_g_loss_v = train_step_generator(X_mb, Z_mb)
+        #_, step_g_loss_u, step_g_loss_s, step_g_loss_v = sess.run([G_solver, G_loss_U, G_loss_S, G_loss_V], feed_dict={Z: Z_mb, X: X_mb, T: T_mb})
+        # Train embedder        
+        step_e_loss_t0 = train_step_joint_embed(X_mb, Z_mb)
+
+        #_, step_e_loss_t0 = sess.run([E_solver, E_loss_T0], feed_dict={Z: Z_mb, X: X_mb, T: T_mb})   
+             
+      # Discriminator training        
+      # Set mini-batch
+      X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)           
       # Random vector generation
       Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
-      # Train generator
-      _, step_g_loss_u, step_g_loss_s, step_g_loss_v = sess.run([G_solver, G_loss_U, G_loss_S, G_loss_V], feed_dict={Z: Z_mb, X: X_mb, T: T_mb})
-       # Train embedder        
-      _, step_e_loss_t0 = sess.run([E_solver, E_loss_T0], feed_dict={Z: Z_mb, X: X_mb, T: T_mb})   
-           
-    # Discriminator training        
-    # Set mini-batch
-    X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)           
-    # Random vector generation
-    Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
-    # Check discriminator loss before updating
-    check_d_loss = sess.run(D_loss, feed_dict={X: X_mb, T: T_mb, Z: Z_mb})
-    # Train discriminator (only when the discriminator does not work well)
-    if (check_d_loss > 0.15):        
-      _, step_d_loss = sess.run([D_solver, D_loss], feed_dict={X: X_mb, T: T_mb, Z: Z_mb})
-        
-    # Print multiple checkpoints
-    if itt % 1000 == 0:
-      print('step: '+ str(itt) + '/' + str(iterations) + 
-            ', d_loss: ' + str(np.round(step_d_loss,4)) + 
-            ', g_loss_u: ' + str(np.round(step_g_loss_u,4)) + 
-            ', g_loss_s: ' + str(np.round(np.sqrt(step_g_loss_s),4)) + 
-            ', g_loss_v: ' + str(np.round(step_g_loss_v,4)) + 
-            ', e_loss_t0: ' + str(np.round(np.sqrt(step_e_loss_t0),4))  )
-  print('Finish Joint Training')
+      
+      
+      step_d_loss = train_step_discriminator(X_mb, Z_mb)
+          
+      # Print multiple checkpoints
+      if itt % 1000 == 0:
+        print('step: '+ str(itt) + '/' + str(iterations) + 
+              ', d_loss: ' + str(np.round(step_d_loss,4)) + 
+              ', g_loss_u: ' + str(np.round(step_g_loss_u,4)) + 
+              ', g_loss_s: ' + str(np.round(np.sqrt(step_g_loss_s),4)) + 
+              ', g_loss_v: ' + str(np.round(step_g_loss_v,4)) + 
+              ', e_loss_t0: ' + str(np.round(np.sqrt(step_e_loss_t0),4))  )
+    print('Finish Joint Training')
+  
+  train()
+      
+   
+      
     
-  ## Synthetic data generation
-  Z_mb = random_generator(no, z_dim, ori_time, max_seq_len)
-  generated_data_curr = sess.run(X_hat, feed_dict={Z: Z_mb, X: ori_data, T: ori_time})    
-    
-  generated_data = list()
-    
-  for i in range(no):
-    temp = generated_data_curr[i,:ori_time[i],:]
-    generated_data.append(temp)
-        
-  # Renormalization
-  generated_data = generated_data * max_val
-  generated_data = generated_data + min_val
-    
-  return generated_data
+##  ## Synthetic data generation
+##  Z_mb = random_generator(no, z_dim, ori_time, max_seq_len)
+##
+##  generator = (ori_data)
+##  supervisor = H_hat(generator)
+##  generated_data_curr = X_hat(supervisor) sess.run(X_hat, feed_dict={Z: Z_mb, X: ori_data, T: ori_time})    
+##    
+##  generated_data = list()
+##    
+##  for i in range(no):
+##    temp = generated_data_curr[i,:ori_time[i],:]
+##    generated_data.append(temp)
+##        
+##  # Renormalization
+##  generated_data = generated_data * max_val
+##  generated_data = generated_data + min_val
+##    
+##  return generated_data
 
 
