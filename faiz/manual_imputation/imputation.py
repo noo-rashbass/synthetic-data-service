@@ -38,6 +38,20 @@ series_end_date = minmax_time[1]
 delta = timedelta(days=1)
 patients = data['Participant_Id'].unique()
 
+
+# calculates whether ailment is currently active based on future trip to hospital
+def duration_calculator(duration, day_difference):
+
+    if duration - day_difference < 0:
+        status = "Unable to assess"
+        duration = 0
+    else:
+        status = "Yes"
+        duration -= day_difference     # make int when writing
+
+    return status, duration
+
+
 # imputing for each patient
 for patient_id in patients:
 
@@ -68,60 +82,25 @@ for patient_id in patients:
     while current_date < patient_start_date:
         
         abd_pain_duration = first_row['Abdominal pain duration (days) [EUPATH_0000154]']
-        if abd_pain_duration - day_difference < 0:
-            abd_pain = "Unable to assess"
-            abd_pain_duration = 0
-        else:
-            abd_pain = "Yes"
-            abd_pain_duration -= day_difference     # make int when writing
+        abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
 
         anorexia_duration = first_row['Anorexia duration (days) [EUPATH_0000155]']
-        if anorexia_duration - day_difference < 0:
-            anorexia = "Unable to assess"
-            anorexia_duration = 0
-        else:
-            anorexia = "Yes"
-            anorexia_duration -= day_difference     # make int when writing
+        anorexia, anorexia_duration = duration_calculator(anorexia_duration, day_difference)
 
         cough_duration = first_row['Cough duration (days) [EUPATH_0000156]']
-        if cough_duration - day_difference < 0:
-            cough = "Unable to assess"
-            cough_duration = 0
-        else:
-            cough = "Yes"
-            cough_duration -= day_difference     # make int when writing
+        cough, cough_duration = duration_calculator(cough_duration, day_difference)
 
         diarrhoea_duration = first_row['Diarrhea duration (days) [EUPATH_0000157]']
-        if diarrhoea_duration - day_difference < 0:
-            diarrhoea = "Unable to assess"
-            diarrhoea_duration = 0
-        else:
-            diarrhoea = "Yes"
-            diarrhoea_duration -= day_difference     # make int when writing
+        diarrhoea, diarrhoea_duration = duration_calculator(diarrhoea_duration, day_difference)
         
         fatigue_duration = first_row['Fatigue duration (days) [EUPATH_0000158]']
-        if fatigue_duration - day_difference < 0:
-            fatigue = "Unable to assess"
-            fatigue_duration = 0
-        else:
-            fatigue = "Yes"
-            fatigue_duration -= day_difference     # make int when writing
+        fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
         
         febrile_duration = first_row['Fever, subjective duration (days) [EUPATH_0000164]']
-        if febrile_duration - day_difference < 0:
-            febrile = "Unable to assess"
-            febrile_duration = 0
-        else:
-            febrile = "Yes"
-            febrile_duration -= day_difference     # make int when writing
+        febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
 
         headache_duration = first_row['Headache duration (days) [EUPATH_0000159]']
-        if headache_duration - day_difference < 0:
-            headache = "Unable to assess"
-            headache_duration = 0
-        else:
-            headache = "Yes"
-            headache_duration -= day_difference     # make int when writing
+        headache, headache_duration = duration_calculator(headache_duration, day_difference)
         
         # set height as NAN for children and constant for adults (may change for children in the future)
         height = np.nan
@@ -132,51 +111,26 @@ for patient_id in patients:
         haemoglobin = round(patient['Hemoglobin (g/dL) [EUPATH_0000047]'].mean(), 1)
 
         jaundice_duration = first_row['Jaundice duration (days) [EUPATH_0000160]']
-        if jaundice_duration - day_difference < 0:
-            jaundice = "Unable to assess"
-            jaundice_duration = 0
-        else:
-            jaundice = "Yes"
-            jaundice_duration -= day_difference     # make int when writing
+        jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
 
         joint_pains_duration = first_row['Joint pains duration (days) [EUPATH_0000161]']
-        if joint_pains_duration - day_difference < 0:
-            joint_pains = "Unable to assess"
-            joint_pains_duration = 0
-        else:
-            joint_pains = "Yes"
-            joint_pains_duration -= day_difference     # make int when writing
+        joint_pains, joint_pains_duration = duration_calculator(joint_pains_duration, day_difference)
 
         malaria_diagnosis_parasite_status = "Blood smear not indicated"
         malaria_treatment = "No malaria medications given"
 
         muscle_aches_duration = first_row['Muscle aches duration (days) [EUPATH_0000162]']
-        if muscle_aches_duration - day_difference < 0:
-            muscle_aches = "Unable to assess"
-            muscle_aches_duration = 0
-        else:
-            muscle_aches = "Yes"
-            muscle_aches_duration -= day_difference     # make int when writing
+        muscle_aches, muscle_aches_duration = duration_calculator(muscle_aches_duration, day_difference)
 
         seizures_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
-        if seizures_duration - day_difference < 0:
-            seizures = "Unable to assess"
-            seizures_duration = 0
-        else:
-            seizures = "Yes"
-            seizures_duration -= day_difference     # make int when writing
+        seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
 
         temperature = round(patient['Temperature (C) [EUPATH_0000110]'].mean(), 1)
         visit_date = current_date
         visit_type = "Scheduled visit"
 
         vomiting_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
-        if vomiting_duration - day_difference < 0:
-            vomiting = "Unable to assess"
-            vomiting_duration = 0
-        else:
-            vomiting = "Yes"
-            vomiting_duration -= day_difference     # make int when writing
+        vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
 
         # weight NAN for children, averaging for adults
         weight = np.nan
@@ -242,7 +196,6 @@ for patient_id in patients:
         }
 
         #patient = patient.append(imputed_row, ignore_index=True)   # append imputed row to patient
-
         imputed_obs_id += 1
         current_age += 1/365
 
@@ -284,6 +237,14 @@ for patient_id in patients:
                 abd_pain_duration -= day_difference     # make int when writing
 
             current_age += 1/365
+
+            anorexia_duration = first_row['Anorexia duration (days) [EUPATH_0000155]']
+            if anorexia_duration - day_difference < 0:
+                anorexia = "Unable to assess"
+                anorexia_duration = 0
+            else:
+                anorexia = "Yes"
+                anorexia_duration -= day_difference     # make int when writing
 
             day_difference -= 1
                 
