@@ -52,6 +52,25 @@ def duration_calculator(duration, day_difference):
     return status, duration
 
 
+# checks whether column has same values for all rows, e.g. height
+def is_equal_throughout(column):
+
+    a = column.to_numpy() # s.values (pandas<0.24)
+    return (a[0] == a).all()
+
+
+# linearly model a variable between visits
+def linear_modelling(patient, same_throughout, real_visit, day_difference):
+
+    if not same_throughout:
+        current_height = patient.iloc[real_visit - 1]['Height (cm) [EUPATH_0010075]']
+        new_height = patient.iloc[real_visit]['Height (cm) [EUPATH_0010075]']
+        daily_height_increase = (new_height - current_height)/day_difference
+ 
+        return daily_height_increase
+    return 0
+
+
 # imputing for each patient
 for patient_id in patients:
 
@@ -77,6 +96,7 @@ for patient_id in patients:
     age = first_row["Age at visit (years) [EUPATH_0000113]"]
     current_age = age - day_difference/365
     current_date = series_start_date
+    same_height_throughout = is_equal_throughout(patient['Height (cm) [EUPATH_0010075]'])
 
     # imputing from series start date to patient start date
     while current_date < patient_start_date:
@@ -104,7 +124,7 @@ for patient_id in patients:
         
         # set height as NAN for children and constant for adults (may change for children in the future)
         height = np.nan
-        if current_age > 20:
+        if same_height_throughout:
             height = first_row['Height (cm) [EUPATH_0010075]']
 
         # averaging haemoglobin
@@ -209,8 +229,10 @@ for patient_id in patients:
     current_date += delta
     real_visit = 1
     day_difference = (visit_dates.iloc[real_visit] - current_date).days
-    current_age = first_row['Age at visit (years) [EUPATH_0000113]'] + 1/365
-    
+    current_age = first_row['Age at visit (years) [EUPATH_0000113]'] + 1/365 
+    current_height = first_row['Height (cm) [EUPATH_0010075]']
+    daily_height_increase = linear_modelling(patient, same_height_throughout, 1, day_difference)       
+
     # go through each date from first visit to last visit and check if real visit exists on this date
     # if not, impute one
     while real_visit < len(visit_dates) - 1:
@@ -223,31 +245,48 @@ for patient_id in patients:
             observation_id += 1
             day_difference = (visit_dates.iloc[real_visit] - current_date).days
 
+            daily_height_increase = linear_modelling(patient, same_height_throughout, 1, day_difference)       
+
+
         else:
 
             # do imputation for this date
             observation_id += 1
 
             abd_pain_duration = patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
-            if abd_pain_duration - day_difference < 0:
-                abd_pain = "Unable to assess"
-                abd_pain_duration = 0
-            else:
-                abd_pain = "Yes"
-                abd_pain_duration -= day_difference     # make int when writing
+            abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
 
-            current_age += 1/365
+            anorexia_duration = patient.iloc[real_visit]['Anorexia duration (days) [EUPATH_0000155]']
+            anorexia, anorexia_duration = duration_calculator(anorexia_duration, day_difference)
 
-            anorexia_duration = first_row['Anorexia duration (days) [EUPATH_0000155]']
-            if anorexia_duration - day_difference < 0:
-                anorexia = "Unable to assess"
-                anorexia_duration = 0
+            cough_duration = patient.iloc[real_visit]['Cough duration (days) [EUPATH_0000156]']
+            cough, cough_duration = duration_calculator(cough_duration, day_difference)
+
+            days_since_enrollment = (current_date - patient_start_date).days
+
+            diarrhoea_duration = patient.iloc[real_visit]['Diarrhea duration (days) [EUPATH_0000157]']
+            diarrhoea, diarrhoea_duration = duration_calculator(diarrhoea_duration, day_difference)
+
+            fatigue_duration = patient.iloc[real_visit]['Fatigue duration (days) [EUPATH_0000158]']
+            fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
+            
+            febrile_duration = patient.iloc[real_visit]\
+                ['Fever, subjective duration (days) [EUPATH_0000164]']
+            febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
+
+            headache_duration = patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
+            headache, headache_duration = duration_calculator(headache_duration, day_difference)
+
+            # check if same_height_throughout & linearly model height between visits
+            if same_height_throughout:
+                current_height = patient.iloc[real_visit]['Height (cm) [EUPATH_0010075]']
             else:
-                anorexia = "Yes"
-                anorexia_duration -= day_difference     # make int when writing
+                current_height += daily_height_increase
 
             day_difference -= 1
-                
+            current_age += 1/365
+
+        print(current_height, daily_height_increase)
         current_date += delta
 
     break
