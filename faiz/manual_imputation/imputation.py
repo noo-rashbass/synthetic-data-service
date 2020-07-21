@@ -12,6 +12,26 @@ imputed_df = data[0:0]
 minmax_time = [min(data['Visit date [EUPATH_0000091]']),\
                max(data['Visit date [EUPATH_0000091]'])]
 
+# setting nan values
+admitting_hospital = np.nan
+asex_plasmod_density = np.nan
+asex_plasmod_present = np.nan
+complex_diagnosis_basis = np.nan
+complicated_malaria = np.nan
+days_since_enrollment = np.nan
+diagnosis_at_hospital = np.nan
+hospital_admission_date = np.nan
+hospital_discharge_date = np.nan
+itn = np.nan
+malaria_diagnosis = np.nan
+non_malaria_medication = np.nan
+other_diagnosis = np.nan
+other_medical_complaint = np.nan
+plasmod_gametocytes_present = np.nan
+severe_malaria_criteria = np.nan
+subjective_fever = np.nan
+submic_plasmod_present = np.nan
+
 # latest end date
 series_end_date = minmax_time[1]
 
@@ -55,8 +75,6 @@ for patient_id in patients:
             abd_pain = "Yes"
             abd_pain_duration -= day_difference     # make int when writing
 
-        admitting_hospital = np.nan
-
         anorexia_duration = first_row['Anorexia duration (days) [EUPATH_0000155]']
         if anorexia_duration - day_difference < 0:
             anorexia = "Unable to assess"
@@ -65,11 +83,6 @@ for patient_id in patients:
             anorexia = "Yes"
             anorexia_duration -= day_difference     # make int when writing
 
-        asex_plasmod_density = np.nan
-        asex_plasmod_present = np.nan
-        complex_diagnosis_basis = np.nan
-        complicated_malaria = np.nan
-
         cough_duration = first_row['Cough duration (days) [EUPATH_0000156]']
         if cough_duration - day_difference < 0:
             cough = "Unable to assess"
@@ -77,9 +90,6 @@ for patient_id in patients:
         else:
             cough = "Yes"
             cough_duration -= day_difference     # make int when writing
-
-        days_since_enrollment = np.nan
-        diagnosis_at_hospital = np.nan
 
         diarrhoea_duration = first_row['Diarrhea duration (days) [EUPATH_0000157]']
         if diarrhoea_duration - day_difference < 0:
@@ -120,9 +130,6 @@ for patient_id in patients:
 
         # averaging haemoglobin
         haemoglobin = round(patient['Hemoglobin (g/dL) [EUPATH_0000047]'].mean(), 1)
-        hospital_admission_date = np.nan
-        hospital_discharge_date = np.nan
-        itn = np.nan
 
         jaundice_duration = first_row['Jaundice duration (days) [EUPATH_0000160]']
         if jaundice_duration - day_difference < 0:
@@ -140,7 +147,6 @@ for patient_id in patients:
             joint_pains = "Yes"
             joint_pains_duration -= day_difference     # make int when writing
 
-        malaria_diagnosis = np.nan
         malaria_diagnosis_parasite_status = "Blood smear not indicated"
         malaria_treatment = "No malaria medications given"
 
@@ -152,11 +158,6 @@ for patient_id in patients:
             muscle_aches = "Yes"
             muscle_aches_duration -= day_difference     # make int when writing
 
-        non_malaria_medication = np.nan
-        other_diagnosis = np.nan
-        other_medical_complaint = np.nan
-        plasmod_gametocytes_present = np.nan
-
         seizures_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
         if seizures_duration - day_difference < 0:
             seizures = "Unable to assess"
@@ -164,10 +165,6 @@ for patient_id in patients:
         else:
             seizures = "Yes"
             seizures_duration -= day_difference     # make int when writing
-        
-        severe_malaria_criteria = np.nan
-        subjective_fever = np.nan
-        submic_plasmod_present = np.nan
 
         temperature = round(patient['Temperature (C) [EUPATH_0000110]'].mean(), 1)
         visit_date = current_date
@@ -252,18 +249,23 @@ for patient_id in patients:
         current_date += delta
         day_difference -= 1
 
+# =====================================================================================================
+
     # imputation between visit dates
     visit_dates = patient['Visit date [EUPATH_0000091]']
     current_date += delta
     real_visit = 1
     day_difference = (visit_dates.iloc[real_visit] - current_date).days
+    current_age = first_row['Age at visit (years) [EUPATH_0000113]'] + 1/365
     
     # go through each date from first visit to last visit and check if real visit exists on this date
     # if not, impute one
-    while real_visit < len(visit_dates):
+    while real_visit < len(visit_dates) - 1:
+
+        print(real_visit, len(visit_dates))
 
         if current_date == visit_dates.iloc[real_visit]:
-            current_date += delta
+            current_age = patient.iloc[real_visit]['Age at visit (years) [EUPATH_0000113]']
             real_visit += 1
             observation_id += 1
             day_difference = (visit_dates.iloc[real_visit] - current_date).days
@@ -281,11 +283,11 @@ for patient_id in patients:
                 abd_pain = "Yes"
                 abd_pain_duration -= day_difference     # make int when writing
 
+            current_age += 1/365
 
-            current_date += delta
             day_difference -= 1
-            print(current_date, day_difference)
-        
+                
+        current_date += delta
 
     break
 
