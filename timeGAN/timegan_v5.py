@@ -10,8 +10,6 @@ warnings.filterwarnings("ignore")
 tf.keras.backend.set_floatx('float64')
 
 def timegan(ori_data, parameters):
-    
-    #reset default graph?
 
     # Basic Parameters
     no, seq_len, dim = np.asarray(ori_data).shape
@@ -76,14 +74,17 @@ def timegan(ori_data, parameters):
             embedder_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         embedder_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
-        # e_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
+        
+        # e_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers-1)])
+    
         # embedder_model = tf.keras.Sequential([
-                                   
-        #     tf.keras.layers.RNN(e_cell, return_sequences=True), 
+            #needs some code for the first layer with diff input size   
+            # but this does not solve the "multiple" output shape issue??               
+        #    tf.keras.layers.RNN(e_cell, return_sequences=True), 
                        
-        #     tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
+        #    tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
 
-        #   ])
+        # ])
 
         return embedder_model
 
@@ -248,7 +249,7 @@ def timegan(ori_data, parameters):
     generator_optimizer = tf.keras.optimizers.Adam()
     discriminator_optimizer = tf.keras.optimizers.Adam()
 
-    @tf.function
+    #@tf.function
     def train_step_embedder(X_mb, T_mb):
 
         with tf.GradientTape() as embedder_tape:
@@ -268,9 +269,9 @@ def timegan(ori_data, parameters):
         
         with tf.GradientTape() as gen_s_tape: #, tf.GradientTape() as s_tape:
             # Generator
-            E_hat_mb = generator_model(Z_mb, T_mb)
-            H_hat_mb = supervisor_model(E_hat_mb, T_mb)
-            H_hat_supervise_mb = supervisor_model(H_mb, T_mb)
+            E_hat_mb = generator_model(Z_mb)
+            H_hat_mb = supervisor_model(E_hat_mb)
+            H_hat_supervise_mb = supervisor_model(H_mb)
 
             gen_s_loss = get_generator_s_loss(H_mb, H_hat_supervise_mb) #hot sure if i shoudl do whole gen loss or only gen_s loss
             gen_s_vars = generator_model.trainable_variables + supervisor_model.trainable_variables 
@@ -282,23 +283,24 @@ def timegan(ori_data, parameters):
 
         return E_hat_mb, H_hat_mb, H_hat_supervise_mb, gen_s_loss #,generator_model, supervisor_model
 
+    @tf.function
     def train_step_joint(Z_mb, H_hat_mb, H_mb, T_mb, E_hat_mb, X_mb, H_hat_supervise_mb):
         #train generator
         with tf.GradientTape() as gen_tape:
             # Generator
             #not sure if i should call these generators and supervisors again
-            #because returning models from train_step_generator_s and getting trainable variables foes not work?
+            #because returning models from train_step_generator_s and getting trainable variables does not work?
             #so called it again here
-            E_hat_mb = generator_model(Z_mb, T_mb)
-            H_hat_mb = supervisor_model(E_hat_mb, T_mb)
-            H_hat_supervise_mb = supervisor_model(H_mb, T_mb)
+            E_hat_mb = generator_model(Z_mb)
+            H_hat_mb = supervisor_model(E_hat_mb)
+            H_hat_supervise_mb = supervisor_model(H_mb)
             
             # Synthetic data
-            X_hat_mb = recovery_model(H_hat_mb, T_mb)
+            X_hat_mb = recovery_model(H_hat_mb)
             # Discriminator
-            Y_fake_mb = discriminator_model(H_hat_mb, T_mb)
-            Y_real_mb = discriminator_model(H_mb, T_mb)
-            Y_fake_e_mb = discriminator_model(E_hat_mb, T_mb)
+            Y_fake_mb = discriminator_model(H_hat_mb)
+            Y_real_mb = discriminator_model(H_mb)
+            Y_fake_e_mb = discriminator_model(E_hat_mb)
 
             gen_loss, g_loss_u, gen_s_loss, g_loss_v = get_generator_loss(Y_fake_mb, Y_fake_e_mb, X_hat_mb, X_mb, H_mb, H_hat_supervise_mb)
             gen_vars = generator_model.trainable_variables + supervisor_model.trainable_variables
@@ -319,15 +321,16 @@ def timegan(ori_data, parameters):
         
         return H_hat_mb, E_hat_mb, emb_T0_loss, g_loss_u, gen_s_loss, g_loss_v #and sth else
 
+    @tf.function
     def train_step_discriminator(H_hat_mb, T_mb, H_mb, E_hat_mb):
         
         with tf.GradientTape() as disc_tape:
             # Synthetic data
-            X_hat_mb = recovery_model(H_hat_mb, T_mb)
+            X_hat_mb = recovery_model(H_hat_mb)
             # Discriminator
-            Y_fake_mb = discriminator_model(H_hat_mb, T_mb)
-            Y_real_mb = discriminator_model(H_mb, T_mb)
-            Y_fake_e_mb = discriminator_model(E_hat_mb, T_mb)
+            Y_fake_mb = discriminator_model(H_hat_mb)
+            Y_real_mb = discriminator_model(H_mb)
+            Y_fake_e_mb = discriminator_model(E_hat_mb)
 
             # Check discriminator loss before updating
             disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
@@ -402,21 +405,37 @@ def timegan(ori_data, parameters):
         print('Finish Joint Training')
 
         ## Synthetic data generation
+        Z_mb = random_generator(no, z_dim, ori_time, max_seq_len)
+        E_hat_generated = generator_model(Z_mb, T_mb)
+        H_hat_generated = supervisor_model(E_hat_generated, T_mb)
+        generated_data_curr = recovery_model(H_hat_generated, T_mb)
         
-    train()
+        generated_data = list()
+
+        for i in range(no):
+            temp = generated_data_curr[i,:ori_time[i],:]
+            generated_data.append(temp)
+                
+        # Renormalization
+        generated_data = generated_data * max_val
+        generated_data = generated_data + min_val
+    
+        return generated_data
+        
+    return train()
 
 ####TESTING####
 
 from data_loading import real_data_loading, sine_data_generation
 
 data_name = 'sine'
-seq_len = 5
+seq_len = 9
 
 if data_name in ['stock', 'energy']:
   ori_data = real_data_loading(data_name, seq_len)
 elif data_name == 'sine':
   # Set number of samples and its dimensions
-  no, dim = 20, 2
+  no, dim = 15, 5
   ori_data = sine_data_generation(no, seq_len, dim)
     
 print(data_name + ' dataset is ready.')
@@ -424,10 +443,13 @@ print(data_name + ' dataset is ready.')
 ## Newtork parameters
 parameters = dict()
 
-parameters['module'] = 'gru' 
-parameters['hidden_dim'] = 6
+parameters['module'] = 'lstm' 
+parameters['hidden_dim'] = 4
 parameters['num_layer'] = 3
 parameters['iterations'] = 10
-parameters['batch_size'] = 4
+parameters['batch_size'] = 7
 
-timegan(ori_data, parameters)
+generated_data = timegan(ori_data, parameters)
+print('Finish Synthetic Data Generation')
+print(generated_data)
+
