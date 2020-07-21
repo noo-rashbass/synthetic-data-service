@@ -9,6 +9,11 @@ import warnings
 warnings.filterwarnings("ignore")
 tf.keras.backend.set_floatx('float64')
 
+# 3. Metrics
+from metrics.discriminative_metrics import discriminative_score_metrics
+from metrics.predictive_metrics import predictive_score_metrics
+from metrics.visualization_metrics import visualization
+
 def timegan(ori_data, parameters):
 
     # Basic Parameters
@@ -50,13 +55,6 @@ def timegan(ori_data, parameters):
     z_dim        = dim
     gamma        = 1
 
-    # Input place holders
-    # tf.keras.backend.placeholder
-    #tf.Variable
-    #https://stackoverflow.com/questions/58986126/replacing-placeholder-for-tensorflow-v2
-    #X = tf.keras.Input(shape=(max_seq_len, dim), dtype="float32", name="myinput_x")
-    #Z = tf.keras.Input(shape=(max_seq_len, dim), dtype="float32", name="myinput_z")
-    #T = tf.keras.Input(shape=(), dtype="int32", name="myinput_t")
 
     def make_embedder ():
         """Embedding network between original feature space to latent space.
@@ -200,18 +198,22 @@ def timegan(ori_data, parameters):
     supervisor_model = make_supervisor()
     discriminator_model = make_discriminator()
 
-    def get_embedder_0_loss(X, X_tilde):
-        mse = tf.keras.losses.MeanSquaredError() 
-
-        E_loss_T0 = mse(X, X_tilde) ##reconstruction loss 
-        #can call E_loss_T0 from below function
-        E_loss0 = 10*tf.sqrt(E_loss_T0)
-        return E_loss0
-    
     def get_embedder_T0_loss(X, X_tilde):
         mse = tf.keras.losses.MeanSquaredError() 
         E_loss_T0 = mse(X, X_tilde)
         return E_loss_T0
+
+    def get_embedder_0_loss(X, X_tilde): 
+        E_loss_T0 = get_embedder_T0_loss(X, X_tilde)
+        E_loss0 = 10*tf.sqrt(E_loss_T0)
+        return E_loss0
+    
+    def get_embedder_loss(X, X_tilde, H, H_hat_supervise):
+        E_loss_T0 = get_embedder_T0_loss(X, X_tilde)
+        E_loss0 = 10*tf.sqrt(E_loss_T0) #could use function above
+        G_loss_S = get_generator_s_loss(H, H_hat_supervise)
+        E_loss = E_loss0 + 0.1*G_loss_S
+        return E_loss
 
     def get_generator_s_loss(H, H_hat_supervise):
         mse = tf.keras.losses.MeanSquaredError()
@@ -250,7 +252,7 @@ def timegan(ori_data, parameters):
     discriminator_optimizer = tf.keras.optimizers.Adam()
 
     #@tf.function
-    def train_step_embedder(X_mb, T_mb):
+    def train_step_embedder(X_mb):
 
         with tf.GradientTape() as embedder_tape:
             # Embedder & Recovery
@@ -262,18 +264,19 @@ def timegan(ori_data, parameters):
             gradients_of_embedder = embedder_tape.gradient(embedder_0_loss, emb_vars)
             embedder0_optimizer.apply_gradients(zip(gradients_of_embedder, emb_vars))
         
-        return H_mb, embedder_0_loss
+        return embedder_0_loss
 
     @tf.function
-    def train_step_generator_s(Z_mb, T_mb, H_mb):
+    def train_step_generator_s(X_mb, Z_mb):
         
         with tf.GradientTape() as gen_s_tape: #, tf.GradientTape() as s_tape:
             # Generator
+            H_mb = embedder_model(X_mb) #recalled
             E_hat_mb = generator_model(Z_mb)
             H_hat_mb = supervisor_model(E_hat_mb)
             H_hat_supervise_mb = supervisor_model(H_mb)
 
-            gen_s_loss = get_generator_s_loss(H_mb, H_hat_supervise_mb) #hot sure if i shoudl do whole gen loss or only gen_s loss
+            gen_s_loss = get_generator_s_loss(H_mb, H_hat_supervise_mb) #hot sure if i should do whole gen loss or only gen_s loss
             gen_s_vars = generator_model.trainable_variables + supervisor_model.trainable_variables 
             #vars = [generator_model.trainable_variables, supervisor_model.trainable_variables]
             gradients_of_gen_s = gen_s_tape.gradient(gen_s_loss, gen_s_vars)
@@ -281,20 +284,21 @@ def timegan(ori_data, parameters):
 
             #there's some warning that says gradients do not exist for variables in the generator when minimizing loss
 
-        return E_hat_mb, H_hat_mb, H_hat_supervise_mb, gen_s_loss #,generator_model, supervisor_model
+        return gen_s_loss # E_hat_mb, H_hat_mb, H_hat_supervise_mb,  #,generator_model, supervisor_model
 
     @tf.function
-    def train_step_joint(Z_mb, H_hat_mb, H_mb, T_mb, E_hat_mb, X_mb, H_hat_supervise_mb):
+    def train_step_joint(X_mb, Z_mb):
         #train generator
         with tf.GradientTape() as gen_tape:
             # Generator
             #not sure if i should call these generators and supervisors again
             #because returning models from train_step_generator_s and getting trainable variables does not work?
             #so called it again here
-            E_hat_mb = generator_model(Z_mb)
-            H_hat_mb = supervisor_model(E_hat_mb)
-            H_hat_supervise_mb = supervisor_model(H_mb)
-            
+            H_mb = embedder_model(X_mb) #recalled
+            E_hat_mb = generator_model(Z_mb) #is this a recall?
+            H_hat_mb = supervisor_model(E_hat_mb) #recall
+            H_hat_supervise_mb = supervisor_model(H_mb) #recall
+
             # Synthetic data
             X_hat_mb = recovery_model(H_hat_mb)
             # Discriminator
@@ -310,22 +314,28 @@ def timegan(ori_data, parameters):
         #train embedder
         with tf.GradientTape() as embedder_tape:
 
-            #this is called again??
-            H_mb_1 = embedder_model(X_mb)
-            X_tilde_mb = recovery_model(H_mb_1) #which H_mb to use?
-
-            emb_T0_loss = get_embedder_T0_loss(X_mb, X_tilde_mb) #not sure if this should be E_loss or E_loss_T0
+            H_mb = embedder_model(X_mb) #recall
+            X_tilde_mb = recovery_model(H_mb) 
+            H_hat_supervise = supervisor_model(H_mb) #called in order to get emb_loss
+            
+            #not sure if this should be E_loss or E_loss_T0 
+            #i think we are minimizing E_loss but printing out E_loss_T0??
+            emb_T0_loss = get_embedder_T0_loss(X_mb, X_tilde_mb)
+            emb_loss = get_embedder_loss(X_mb, X_tilde_mb, H_mb, H_hat_supervise) 
             emb_vars = embedder_model.trainable_variables + recovery_model.trainable_variables
-            gradients_of_emb = embedder_tape.gradient(emb_T0_loss, emb_vars)
+            gradients_of_emb = embedder_tape.gradient(emb_loss, emb_vars)
             embedder_optimizer.apply_gradients(zip(gradients_of_emb, emb_vars))
         
-        return H_hat_mb, E_hat_mb, emb_T0_loss, g_loss_u, gen_s_loss, g_loss_v #and sth else
+        return emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v #H_hat_mb, E_hat_mb, 
 
     @tf.function
-    def train_step_discriminator(H_hat_mb, T_mb, H_mb, E_hat_mb):
+    def train_step_discriminator(X_mb, Z_mb):
         
         with tf.GradientTape() as disc_tape:
             # Synthetic data
+            H_mb = embedder_model(X_mb) #recall
+            E_hat_mb = generator_model(Z_mb) #recall
+            H_hat_mb = supervisor_model(E_hat_mb) #recall
             X_hat_mb = recovery_model(H_hat_mb)
             # Discriminator
             Y_fake_mb = discriminator_model(H_hat_mb)
@@ -336,7 +346,7 @@ def timegan(ori_data, parameters):
             disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
             # Train discriminator (only when the discriminator does not work well)
             if (disc_loss > 0.15):
-                disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
+                #disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
                 disc_vars = discriminator_model.trainable_variables
                 gradients_of_disc = disc_tape.gradient(disc_loss, disc_vars)
                 discriminator_optimizer.apply_gradients(zip(gradients_of_disc, disc_vars))
@@ -349,10 +359,10 @@ def timegan(ori_data, parameters):
 
         for itt in range(iterations):
             X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size) 
-            H_mb, step_e_loss = train_step_embedder(X_mb, T_mb)
+            step_e_loss = train_step_embedder(X_mb)
            
             # Checkpoint
-            if itt % 1000 == 0:
+            if itt % 1 == 0:
                 print('step: '+ str(itt) + '/' + str(iterations) + ', e_loss: ' + str(np.round(np.sqrt(step_e_loss),4)) )
 
         print('Finish Embedding Network Training')
@@ -365,10 +375,10 @@ def timegan(ori_data, parameters):
             # Random vector generation 
             Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
             # Train generator
-            E_hat_mb, H_hat_mb, H_hat_supervise_mb, step_gen_s_loss = train_step_generator_s(Z_mb, T_mb, H_mb)
+            step_gen_s_loss = train_step_generator_s(X_mb, Z_mb)
 
             # Checkpoint
-            if itt % 10 == 0:
+            if itt % 1 == 0:
                 print('step: '+ str(itt)  + '/' + str(iterations) +', s_loss: ' + str(np.round(np.sqrt(step_gen_s_loss),4)) )
 
         print('Finish Training with Supervised Loss Only')
@@ -383,7 +393,7 @@ def timegan(ori_data, parameters):
                 X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size) 
                 Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
                 # Train generator
-                H_hat_mb, E_hat_mb, emb_T0_loss, g_loss_u, gen_s_loss, g_loss_v = train_step_joint(Z_mb, H_hat_mb, H_mb, T_mb, E_hat_mb, X_mb, H_hat_supervise_mb)
+                emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v = train_step_joint(X_mb, Z_mb)
 
             # Discriminator training        
             # Set mini-batch
@@ -391,10 +401,10 @@ def timegan(ori_data, parameters):
             # Random vector generation
             Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
             #train discriminator
-            d_loss = train_step_discriminator(H_hat_mb, T_mb, H_mb, E_hat_mb)
+            d_loss = train_step_discriminator(X_mb, Z_mb)
 
             # Print multiple checkpoints
-            if itt % 10 == 0:
+            if itt % 1 == 0:
                 print('step: '+ str(itt) + '/' + str(iterations) + 
                     ', d_loss: ' + str(np.round(d_loss,4)) + 
                     ', g_loss_u: ' + str(np.round(g_loss_u,4)) + 
@@ -406,9 +416,9 @@ def timegan(ori_data, parameters):
 
         ## Synthetic data generation
         Z_mb = random_generator(no, z_dim, ori_time, max_seq_len)
-        E_hat_generated = generator_model(Z_mb, T_mb)
-        H_hat_generated = supervisor_model(E_hat_generated, T_mb)
-        generated_data_curr = recovery_model(H_hat_generated, T_mb)
+        E_hat_generated = generator_model(Z_mb)
+        H_hat_generated = supervisor_model(E_hat_generated)
+        generated_data_curr = recovery_model(H_hat_generated)
         
         generated_data = list()
 
@@ -451,5 +461,5 @@ parameters['batch_size'] = 7
 
 generated_data = timegan(ori_data, parameters)
 print('Finish Synthetic Data Generation')
-print(generated_data)
+#print(generated_data)
 
