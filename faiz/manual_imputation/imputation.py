@@ -24,7 +24,6 @@ for patient_id in patients:
     patient = data[data['Participant_Id'] == patient_id].\
                         sort_values(['Visit date [EUPATH_0000091]']).reset_index(drop=True)
 
-    print(patient)
     # earliest start date
     series_start_date = minmax_time[0]
     
@@ -36,17 +35,19 @@ for patient_id in patients:
 
     day_difference = (patient_start_date - series_start_date).days
 
-    observation_id = patient.iloc[0]['Observation_Id']
+    first_row = patient.iloc[0]
+
+    observation_id = first_row['Observation_Id']
     imputed_obs_id = observation_id - day_difference
-    household_id = patient.iloc[0]['Household_Id']
-    age = patient.iloc[0]["Age at visit (years) [EUPATH_0000113]"]
+    household_id = first_row['Household_Id']
+    age = first_row["Age at visit (years) [EUPATH_0000113]"]
     current_age = age - day_difference/365
     current_date = series_start_date
 
     # imputing from series start date to patient start date
     while current_date < patient_start_date:
         
-        abd_pain_duration = patient.iloc[0]['Abdominal pain duration (days) [EUPATH_0000154]']
+        abd_pain_duration = first_row['Abdominal pain duration (days) [EUPATH_0000154]']
         if abd_pain_duration - day_difference < 0:
             abd_pain = "Unable to assess"
             abd_pain_duration = 0
@@ -56,7 +57,7 @@ for patient_id in patients:
 
         admitting_hospital = np.nan
 
-        anorexia_duration = patient.iloc[0]['Anorexia duration (days) [EUPATH_0000155]']
+        anorexia_duration = first_row['Anorexia duration (days) [EUPATH_0000155]']
         if anorexia_duration - day_difference < 0:
             anorexia = "Unable to assess"
             anorexia_duration = 0
@@ -69,7 +70,7 @@ for patient_id in patients:
         complex_diagnosis_basis = np.nan
         complicated_malaria = np.nan
 
-        cough_duration = patient.iloc[0]['Cough duration (days) [EUPATH_0000156]']
+        cough_duration = first_row['Cough duration (days) [EUPATH_0000156]']
         if cough_duration - day_difference < 0:
             cough = "Unable to assess"
             cough_duration = 0
@@ -80,7 +81,7 @@ for patient_id in patients:
         days_since_enrollment = np.nan
         diagnosis_at_hospital = np.nan
 
-        diarrhoea_duration = patient.iloc[0]['Diarrhea duration (days) [EUPATH_0000157]']
+        diarrhoea_duration = first_row['Diarrhea duration (days) [EUPATH_0000157]']
         if diarrhoea_duration - day_difference < 0:
             diarrhoea = "Unable to assess"
             diarrhoea_duration = 0
@@ -88,7 +89,7 @@ for patient_id in patients:
             diarrhoea = "Yes"
             diarrhoea_duration -= day_difference     # make int when writing
         
-        fatigue_duration = patient.iloc[0]['Fatigue duration (days) [EUPATH_0000158]']
+        fatigue_duration = first_row['Fatigue duration (days) [EUPATH_0000158]']
         if fatigue_duration - day_difference < 0:
             fatigue = "Unable to assess"
             fatigue_duration = 0
@@ -96,7 +97,7 @@ for patient_id in patients:
             fatigue = "Yes"
             fatigue_duration -= day_difference     # make int when writing
         
-        febrile_duration = patient.iloc[0]['Fever, subjective duration (days) [EUPATH_0000164]']
+        febrile_duration = first_row['Fever, subjective duration (days) [EUPATH_0000164]']
         if febrile_duration - day_difference < 0:
             febrile = "Unable to assess"
             febrile_duration = 0
@@ -104,7 +105,7 @@ for patient_id in patients:
             febrile = "Yes"
             febrile_duration -= day_difference     # make int when writing
 
-        headache_duration = patient.iloc[0]['Headache duration (days) [EUPATH_0000159]']
+        headache_duration = first_row['Headache duration (days) [EUPATH_0000159]']
         if headache_duration - day_difference < 0:
             headache = "Unable to assess"
             headache_duration = 0
@@ -115,7 +116,7 @@ for patient_id in patients:
         # set height as NAN for children and constant for adults (may change for children in the future)
         height = np.nan
         if current_age > 20:
-            height = patient.iloc[0]['Height (cm) [EUPATH_0010075]']
+            height = first_row['Height (cm) [EUPATH_0010075]']
 
         # averaging haemoglobin
         haemoglobin = round(patient['Hemoglobin (g/dL) [EUPATH_0000047]'].mean(), 1)
@@ -123,7 +124,7 @@ for patient_id in patients:
         hospital_discharge_date = np.nan
         itn = np.nan
 
-        jaundice_duration = patient.iloc[0]['Jaundice duration (days) [EUPATH_0000160]']
+        jaundice_duration = first_row['Jaundice duration (days) [EUPATH_0000160]']
         if jaundice_duration - day_difference < 0:
             jaundice = "Unable to assess"
             jaundice_duration = 0
@@ -131,7 +132,7 @@ for patient_id in patients:
             jaundice = "Yes"
             jaundice_duration -= day_difference     # make int when writing
 
-        joint_pains_duration = patient.iloc[0]['Joint pains duration (days) [EUPATH_0000161]']
+        joint_pains_duration = first_row['Joint pains duration (days) [EUPATH_0000161]']
         if joint_pains_duration - day_difference < 0:
             joint_pains = "Unable to assess"
             joint_pains_duration = 0
@@ -143,7 +144,7 @@ for patient_id in patients:
         malaria_diagnosis_parasite_status = "Blood smear not indicated"
         malaria_treatment = "No malaria medications given"
 
-        muscle_aches_duration = patient.iloc[0]['Muscle aches duration (days) [EUPATH_0000162]']
+        muscle_aches_duration = first_row['Muscle aches duration (days) [EUPATH_0000162]']
         if muscle_aches_duration - day_difference < 0:
             muscle_aches = "Unable to assess"
             muscle_aches_duration = 0
@@ -156,7 +157,7 @@ for patient_id in patients:
         other_medical_complaint = np.nan
         plasmod_gametocytes_present = np.nan
 
-        seizures_duration = patient.iloc[0]['Seizures duration (days) [EUPATH_0000163]']
+        seizures_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
         if seizures_duration - day_difference < 0:
             seizures = "Unable to assess"
             seizures_duration = 0
@@ -172,7 +173,7 @@ for patient_id in patients:
         visit_date = current_date
         visit_type = "Scheduled visit"
 
-        vomiting_duration = patient.iloc[0]['Seizures duration (days) [EUPATH_0000163]']
+        vomiting_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
         if vomiting_duration - day_difference < 0:
             vomiting = "Unable to assess"
             vomiting_duration = 0
@@ -243,7 +244,7 @@ for patient_id in patients:
             "real": False
         }
 
-        patient = patient.append(imputed_row, ignore_index=True)
+        #patient = patient.append(imputed_row, ignore_index=True)   # append imputed row to patient
 
         imputed_obs_id += 1
         current_age += 1/365
@@ -251,8 +252,41 @@ for patient_id in patients:
         current_date += delta
         day_difference -= 1
 
-    print(patient[['Observation_Id', 'Participant_Id', 'Visit date [EUPATH_0000091]']].\
-            sort_values(['Visit date [EUPATH_0000091]']))
+    # imputation between visit dates
+    visit_dates = patient['Visit date [EUPATH_0000091]']
+    current_date += delta
+    real_visit = 1
+    day_difference = (visit_dates.iloc[real_visit] - current_date).days
+    
+    # go through each date from first visit to last visit and check if real visit exists on this date
+    # if not, impute one
+    while real_visit < len(visit_dates):
+
+        if current_date == visit_dates.iloc[real_visit]:
+            current_date += delta
+            real_visit += 1
+            observation_id += 1
+            day_difference = (visit_dates.iloc[real_visit] - current_date).days
+
+        else:
+
+            # do imputation for this date
+            observation_id += 1
+
+            abd_pain_duration = patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
+            if abd_pain_duration - day_difference < 0:
+                abd_pain = "Unable to assess"
+                abd_pain_duration = 0
+            else:
+                abd_pain = "Yes"
+                abd_pain_duration -= day_difference     # make int when writing
+
+
+            current_date += delta
+            day_difference -= 1
+            print(current_date, day_difference)
+        
+
     break
 
 '''
