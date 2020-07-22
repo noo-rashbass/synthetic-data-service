@@ -10,6 +10,8 @@ height_string = 'Height (cm) [EUPATH_0010075]'
 haemoglobin_string = 'Hemoglobin (g/dL) [EUPATH_0000047]'
 temperature_string = 'Temperature (C) [EUPATH_0000110]'
 visit_date_string = 'Visit date [EUPATH_0000091]'
+visit_type = "Scheduled visit"
+weight_string = 'Weight (kg) [EUPATH_0000732]'
 
 data[visit_date_string] = pd.to_datetime(data[visit_date_string])
 
@@ -79,8 +81,8 @@ def linear_modelling(patient, real_visit, day_difference, column):
         return [patient[column].mean()]
     else:
         if current_value != new_value:
-            daily_increase = (new_value - current_value)/day_difference
-            return daily_increase
+            daily_change = (new_value - current_value)/day_difference
+            return daily_change
         return 0
 
 
@@ -92,10 +94,10 @@ for patient_id in patients:
 
     # earliest start date
     series_start_date = minmax_time[0]
-    
+
     minmax_time_patient = [min(patient[visit_date_string]),\
                             max(patient[visit_date_string])]
-    
+
     patient_start_date = minmax_time_patient[0]
     patient_end_date = minmax_time_patient[1]
 
@@ -113,7 +115,7 @@ for patient_id in patients:
 
     # imputing from series start date to patient start date
     while current_date < patient_start_date:
-        
+
         abd_pain_duration = first_row['Abdominal pain duration (days) [EUPATH_0000154]']
         abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
 
@@ -125,16 +127,16 @@ for patient_id in patients:
 
         diarrhoea_duration = first_row['Diarrhea duration (days) [EUPATH_0000157]']
         diarrhoea, diarrhoea_duration = duration_calculator(diarrhoea_duration, day_difference)
-        
+
         fatigue_duration = first_row['Fatigue duration (days) [EUPATH_0000158]']
         fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
-        
+
         febrile_duration = first_row['Fever, subjective duration (days) [EUPATH_0000164]']
         febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
 
         headache_duration = first_row['Headache duration (days) [EUPATH_0000159]']
         headache, headache_duration = duration_calculator(headache_duration, day_difference)
-        
+
         # set height as NAN for children and constant for adults (may change for children in the future)
         height = np.nan
         if same_height_throughout:
@@ -157,7 +159,6 @@ for patient_id in patients:
 
         temperature = round(patient[temperature_string].mean(), 1)
         visit_date = current_date
-        visit_type = "Scheduled visit"
 
         vomiting_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
         vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
@@ -165,8 +166,8 @@ for patient_id in patients:
         # weight NAN for children, averaging for adults
         weight = np.nan
         if current_age > 20:
-            weight = round(patient['Weight (kg) [EUPATH_0000732]'].mean(), 1)
-        
+            weight = round(patient[weight_string].mean(), 1)
+
         imputed_row = {
             "Observation_Id": imputed_obs_id, 
             "Participant_Id": patient_id,
@@ -244,10 +245,12 @@ for patient_id in patients:
     current_height = first_row[height_string]
     current_haemoglobin = first_row[haemoglobin_string]
     current_temperature = first_row[temperature_string]
+    current_weight = first_row[weight_string]
 
     daily_height_increase = linear_modelling(patient, 1, day_difference, height_string)
-    daily_haemoglobin_increase = linear_modelling(patient, 1, day_difference, haemoglobin_string)
-    daily_temperature_increase = linear_modelling(patient, 1, day_difference, temperature_string)
+    daily_haemoglobin_change = linear_modelling(patient, 1, day_difference, haemoglobin_string)
+    daily_temperature_change = linear_modelling(patient, 1, day_difference, temperature_string)
+    daily_weight_change = linear_modelling(patient, 1, day_difference, weight_string)
 
     # go through each date from first visit to last visit and check if real visit exists on this date
     # if not, impute one
@@ -260,6 +263,7 @@ for patient_id in patients:
             current_height = patient.iloc[real_visit][age_string]
             current_haemoglobin = patient.iloc[real_visit][haemoglobin_string]
             current_temperature = patient.iloc[real_visit][temperature_string]
+            current_weight = patient.iloc[real_visit][weight_string]
 
             # increment time tracker variables
             real_visit += 1
@@ -268,10 +272,11 @@ for patient_id in patients:
 
             # check if same values between these visits & linearly model values between visits
             daily_height_increase = linear_modelling(patient, real_visit, day_difference, height_string)
-            daily_haemoglobin_increase =\
+            daily_haemoglobin_change =\
                 linear_modelling(patient, real_visit, day_difference, haemoglobin_string)
-            daily_temperature_increase =\
+            daily_temperature_change =\
                 linear_modelling(patient, real_visit, day_difference, temperature_string)
+            daily_weight_change = linear_modelling(patient, real_visit, day_difference, weight_string)
 
         else:
 
@@ -295,7 +300,7 @@ for patient_id in patients:
 
             fatigue_duration = patient.iloc[real_visit]['Fatigue duration (days) [EUPATH_0000158]']
             fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
-            
+
             febrile_duration =\
                 patient.iloc[real_visit]['Fever, subjective duration (days) [EUPATH_0000164]']
             febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
@@ -308,10 +313,10 @@ for patient_id in patients:
             else:
                 current_height = daily_height_increase[0]   # take the mean
 
-            if type(daily_haemoglobin_increase) != list:
-                current_haemoglobin += daily_haemoglobin_increase
+            if type(daily_haemoglobin_change) != list:
+                current_haemoglobin += daily_haemoglobin_change
             else:
-                current_haemoglobin = daily_haemoglobin_increase[0]   # take the mean
+                current_haemoglobin = daily_haemoglobin_change[0]   # take the mean
 
             jaundice_duration = patient.iloc[real_visit]['Jaundice duration (days) [EUPATH_0000160]']
             jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
@@ -325,14 +330,25 @@ for patient_id in patients:
                 patient.iloc[real_visit]['Muscle aches duration (days) [EUPATH_0000162]']
             muscle_aches, muscle_aches_duration =\
                 duration_calculator(muscle_aches_duration, day_difference)
-            
+
             seizures_duration = patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
             seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
 
-            if type(daily_temperature_increase) != list:
-                current_temperature += daily_temperature_increase
+            if type(daily_temperature_change) != list:
+                current_temperature += daily_temperature_change
             else:
-                current_temperature = daily_temperature_increase[0]   # take the mean
+                current_temperature = daily_temperature_change[0]   # take the mean
+
+            visit_date = current_date
+
+            vomiting_duration = patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
+            vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
+
+            # linear modelling for weight
+            if type(daily_weight_change) != list:
+                current_weight += daily_weight_change
+            else:
+                current_weight = daily_weight_change[0]   # take the mean
 
             day_difference -= 1
             current_age += 1/365
