@@ -21,6 +21,7 @@ import tensorflow as tf
 import numpy as np
 from utils import extract_time, rnn_cell, random_generator, batch_generator
 import warnings
+import sys
 warnings.filterwarnings("ignore")
 
 def timegan (ori_data, parameters):
@@ -348,6 +349,14 @@ def timegan (ori_data, parameters):
 
       X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)
       X_mb = X_mb.reshape(batch_size, seq_len, dim)
+
+      embed = H(X_mb)
+      for layer in H.layers:
+        print(layer.output_shape)
+      #H.summary()
+      
+      sys.exit()
+      
       step_e_loss = train_step(X_mb)
 
       # Checkpoint
