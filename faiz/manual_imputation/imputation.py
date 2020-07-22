@@ -23,8 +23,8 @@ minmax_time = [min(data[visit_date_string]),\
 
 # setting nan and constant values
 admitting_hospital = np.nan
-asex_plasmod_density = np.nan
-asex_plasmod_present = np.nan
+ax_plas_density = np.nan
+ax_plas_present = np.nan
 complex_diagnosis_basis = np.nan
 complicated_malaria = np.nan
 days_since_enrollment = np.nan
@@ -36,12 +36,12 @@ malaria_diagnosis = np.nan
 non_malaria_medication = np.nan
 other_diagnosis = np.nan
 other_medical_complaint = np.nan
-plasmod_gametocytes_present = np.nan
+plas_gam_present = np.nan
 severe_malaria_criteria = np.nan
 subjective_fever = np.nan
-submic_plasmod_present = np.nan
+submic_plas_present = np.nan
 
-malaria_diagnosis_parasite_status = "Blood smear not indicated"
+malaria_diagnosis_parasite = "Blood smear not indicated"
 malaria_treatment = "No malaria medications given"
 
 # latest end date
@@ -72,18 +72,30 @@ def is_equal_throughout(column):
 
 
 # linearly model a variable between visits
-def linear_modelling(patient, real_visit, day_difference, column):
+# returns tuple (boolean, value) - boolean if it can be interpolated (True if no nan)
+# value is daily change or mean column value depending on boolean
+def get_linear_modelling_value(patient, real_visit, day_difference, column):
 
     current_value = patient.iloc[real_visit - 1][column]
     new_value = patient.iloc[real_visit][column]
 
     if pd.isna(current_value) or pd.isna(new_value):
-        return [patient[column].mean()]
+        return (False, patient[column].mean())
     else:
         if current_value != new_value:
             daily_change = (new_value - current_value)/day_difference
-            return daily_change
-        return 0
+            return (True, daily_change)
+        return (True, 0)
+
+
+def apply_linear_modelling(variable, change):
+
+    if change[0]:
+        variable += change[1]
+    else:
+        variable = change[1]   # take the mean
+
+    return variable
 
 
 # imputing for each patient
@@ -178,8 +190,8 @@ for patient_id in patients:
             "Age at visit (years) [EUPATH_0000113]": round(current_age, 2),
             "Anorexia [SYMP_0000523]": anorexia,
             "Anorexia duration (days) [EUPATH_0000155]": anorexia_duration,
-            "Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]": asex_plasmod_density,
-            "Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]": asex_plasmod_present,
+            "Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]": ax_plas_density,
+            "Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]": ax_plas_present,
             "Basis of complicated diagnosis [EUPATH_0000316]": complex_diagnosis_basis,
             "Complicated malaria [EUPATH_0000040]": complicated_malaria,
             "Cough [SYMP_0000614]": cough,
@@ -204,19 +216,19 @@ for patient_id in patients:
             "Joint pains [SYMP_0000064]": joint_pains,
             "Joint pains duration (days) [EUPATH_0000161]": joint_pains_duration,
             "Malaria diagnosis [EUPATH_0000090]": malaria_diagnosis,
-            "Malaria diagnosis and parasite status [EUPATH_0000338]": malaria_diagnosis_parasite_status,
+            "Malaria diagnosis and parasite status [EUPATH_0000338]": malaria_diagnosis_parasite,
             "Malaria treatment [EUPATH_0000740]": malaria_treatment,
             "Muscle aches [EUPATH_0000252]": muscle_aches,
             "Muscle aches duration (days) [EUPATH_0000162]": muscle_aches_duration,
             "Non-malaria medication [EUPATH_0000059]": non_malaria_medication,
             "Other diagnosis [EUPATH_0000317]": other_diagnosis,
-            "Other medical complaint [EUPATH_0020002]": other_medical_complaint,
-            "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plasmod_gametocytes_present,
+            "Other medical complaint [EUPATH_0020002]": other_medical_complaint,,
+            "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present
             "Seizures [SYMP_0000124]": seizures,
             "Seizures duration (days) [EUPATH_0000163]": seizures_duration,
             "Severe malaria criteria [EUPATH_0000046]": severe_malaria_criteria,
             "Subjective fever [EUPATH_0000100]": subjective_fever,
-            "Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]": submic_plasmod_present,
+            "Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]": submic_plas_present,
             "Temperature (C) [EUPATH_0000110]": temperature,
             "Visit date [EUPATH_0000091]": visit_date,
             "Visit type [EUPATH_0000311]": visit_type,
@@ -247,10 +259,12 @@ for patient_id in patients:
     current_temperature = first_row[temperature_string]
     current_weight = first_row[weight_string]
 
-    daily_height_increase = linear_modelling(patient, 1, day_difference, height_string)
-    daily_haemoglobin_change = linear_modelling(patient, 1, day_difference, haemoglobin_string)
-    daily_temperature_change = linear_modelling(patient, 1, day_difference, temperature_string)
-    daily_weight_change = linear_modelling(patient, 1, day_difference, weight_string)
+    daily_height_increase = get_linear_modelling_value(patient, 1, day_difference, height_string)
+    daily_haemoglobin_change =\
+        get_linear_modelling_value(patient, 1, day_difference, haemoglobin_string)
+    daily_temperature_change =\
+        get_linear_modelling_value(patient, 1, day_difference, temperature_string)
+    daily_weight_change = get_linear_modelling_value(patient, 1, day_difference, weight_string)
 
     # go through each date from first visit to last visit and check if real visit exists on this date
     # if not, impute one
@@ -265,18 +279,21 @@ for patient_id in patients:
             current_temperature = patient.iloc[real_visit][temperature_string]
             current_weight = patient.iloc[real_visit][weight_string]
 
+
             # increment time tracker variables
             real_visit += 1
             observation_id += 1
             day_difference = (visit_dates.iloc[real_visit] - current_date).days
 
             # check if same values between these visits & linearly model values between visits
-            daily_height_increase = linear_modelling(patient, real_visit, day_difference, height_string)
+            daily_height_increase =\
+                get_linear_modelling_value(patient, real_visit, day_difference, height_string)
             daily_haemoglobin_change =\
-                linear_modelling(patient, real_visit, day_difference, haemoglobin_string)
+                get_linear_modelling_value(patient, real_visit, day_difference, haemoglobin_string)
             daily_temperature_change =\
-                linear_modelling(patient, real_visit, day_difference, temperature_string)
-            daily_weight_change = linear_modelling(patient, real_visit, day_difference, weight_string)
+                get_linear_modelling_value(patient, real_visit, day_difference, temperature_string)
+            daily_weight_change =\
+                get_linear_modelling_value(patient, real_visit, day_difference, weight_string)
 
         else:
 
@@ -308,15 +325,8 @@ for patient_id in patients:
             headache_duration = patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
             headache, headache_duration = duration_calculator(headache_duration, day_difference)
 
-            if type(daily_height_increase) != list:
-                current_height += daily_height_increase
-            else:
-                current_height = daily_height_increase[0]   # take the mean
-
-            if type(daily_haemoglobin_change) != list:
-                current_haemoglobin += daily_haemoglobin_change
-            else:
-                current_haemoglobin = daily_haemoglobin_change[0]   # take the mean
+            current_height = apply_linear_modelling(current_height, daily_height_increase)
+            current_haemoglobin = apply_linear_modelling(current_haemoglobin, daily_haemoglobin_change)
 
             jaundice_duration = patient.iloc[real_visit]['Jaundice duration (days) [EUPATH_0000160]']
             jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
@@ -334,21 +344,71 @@ for patient_id in patients:
             seizures_duration = patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
             seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
 
-            if type(daily_temperature_change) != list:
-                current_temperature += daily_temperature_change
-            else:
-                current_temperature = daily_temperature_change[0]   # take the mean
-
+            current_temperature = apply_linear_modelling(current_temperature, daily_temperature_change)
             visit_date = current_date
 
             vomiting_duration = patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
             vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
 
-            # linear modelling for weight
-            if type(daily_weight_change) != list:
-                current_weight += daily_weight_change
-            else:
-                current_weight = daily_weight_change[0]   # take the mean
+            current_weight = apply_linear_modelling(current_weight, daily_weight_change)
+
+            imputed_row = {
+                "Observation_Id": observation_id, 
+                "Participant_Id": patient_id,
+                "Household_Id": household_id,
+                "Abdominal pain [HP_0002027]": abd_pain,
+                "Abdominal pain duration (days) [EUPATH_0000154]": abd_pain_duration,
+                "Admitting hospital [EUPATH_0000318]": admitting_hospital,
+                "Age at visit (years) [EUPATH_0000113]": round(current_age, 2),
+                "Anorexia [SYMP_0000523]": anorexia,
+                "Anorexia duration (days) [EUPATH_0000155]": anorexia_duration,
+                "Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]": ax_plas_density,
+                "Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]": ax_plas_present,
+                "Basis of complicated diagnosis [EUPATH_0000316]": complex_diagnosis_basis,
+                "Complicated malaria [EUPATH_0000040]": complicated_malaria,
+                "Cough [SYMP_0000614]": cough,
+                "Cough duration (days) [EUPATH_0000156]": cough_duration,
+                "Days since enrollment [EUPATH_0000191]": days_since_enrollment,
+                "Diagnosis at hospitalization [EUPATH_0000638]": diagnosis_at_hospital,
+                "Diarrhea [DOID_13250]": diarrhoea,
+                "Diarrhea duration (days) [EUPATH_0000157]": diarrhoea_duration,
+                "Fatigue [SYMP_0019177]": fatigue,
+                "Fatigue duration (days) [EUPATH_0000158]": fatigue_duration,
+                "Febrile [EUPATH_0000097]": febrile,
+                "Fever, subjective duration (days) [EUPATH_0000164]": febrile_duration,
+                "Headache [HP_0002315]": headache,
+                "Headache duration (days) [EUPATH_0000159]": headache_duration,
+                "Height (cm) [EUPATH_0010075]": current_height,
+                "Hemoglobin (g/dL) [EUPATH_0000047]": round(current_haemoglobin, 1),
+                "Hospital admission date [EUPATH_0000319]": hospital_admission_date,
+                "Hospital discharge date [EUPATH_0000320]": hospital_discharge_date,
+                "ITN last night [EUPATH_0000216]": itn,
+                "Jaundice [HP_0000952]": jaundice,
+                "Jaundice duration (days) [EUPATH_0000160]": jaundice_duration,
+                "Joint pains [SYMP_0000064]": joint_pains,
+                "Joint pains duration (days) [EUPATH_0000161]": joint_pains_duration,
+                "Malaria diagnosis [EUPATH_0000090]": malaria_diagnosis,
+                "Malaria diagnosis and parasite status [EUPATH_0000338]": malaria_diagnosis_parasite,
+                "Malaria treatment [EUPATH_0000740]": malaria_treatment,
+                "Muscle aches [EUPATH_0000252]": muscle_aches,
+                "Muscle aches duration (days) [EUPATH_0000162]": muscle_aches_duration,
+                "Non-malaria medication [EUPATH_0000059]": non_malaria_medication,
+                "Other diagnosis [EUPATH_0000317]": other_diagnosis,
+                "Other medical complaint [EUPATH_0020002]": other_medical_complaint,,
+                "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present
+                "Seizures [SYMP_0000124]": seizures,
+                "Seizures duration (days) [EUPATH_0000163]": seizures_duration,
+                "Severe malaria criteria [EUPATH_0000046]": severe_malaria_criteria,
+                "Subjective fever [EUPATH_0000100]": subjective_fever,
+                "Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]": submic_plas_present,
+                "Temperature (C) [EUPATH_0000110]": round(current_temperature, 1),
+                "Visit date [EUPATH_0000091]": visit_date,
+                "Visit type [EUPATH_0000311]": visit_type,
+                "Vomiting [HP_0002013]": vomiting,
+                "Vomiting duration (days) [EUPATH_0000165]": vomiting_duration,
+                "Weight (kg) [EUPATH_0000732]": round(current_weight * 2) / 2,
+                "real": False
+            }
 
             day_difference -= 1
             current_age += 1/365
