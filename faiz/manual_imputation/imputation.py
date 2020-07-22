@@ -8,6 +8,7 @@ data = pd.read_csv('isaFull.tsv', '\t')
 age_string = 'Age at visit (years) [EUPATH_0000113]'
 height_string = 'Height (cm) [EUPATH_0010075]'
 haemoglobin_string = 'Hemoglobin (g/dL) [EUPATH_0000047]'
+temperature_string = 'Temperature (C) [EUPATH_0000110]'
 visit_date_string = 'Visit date [EUPATH_0000091]'
 
 data[visit_date_string] = pd.to_datetime(data[visit_date_string])
@@ -18,7 +19,7 @@ imputed_df = data[0:0]
 minmax_time = [min(data[visit_date_string]),\
                max(data[visit_date_string])]
 
-# setting nan values
+# setting nan and constant values
 admitting_hospital = np.nan
 asex_plasmod_density = np.nan
 asex_plasmod_present = np.nan
@@ -37,6 +38,9 @@ plasmod_gametocytes_present = np.nan
 severe_malaria_criteria = np.nan
 subjective_fever = np.nan
 submic_plasmod_present = np.nan
+
+malaria_diagnosis_parasite_status = "Blood smear not indicated"
+malaria_treatment = "No malaria medications given"
 
 # latest end date
 series_end_date = minmax_time[1]
@@ -145,16 +149,13 @@ for patient_id in patients:
         joint_pains_duration = first_row['Joint pains duration (days) [EUPATH_0000161]']
         joint_pains, joint_pains_duration = duration_calculator(joint_pains_duration, day_difference)
 
-        malaria_diagnosis_parasite_status = "Blood smear not indicated"
-        malaria_treatment = "No malaria medications given"
-
         muscle_aches_duration = first_row['Muscle aches duration (days) [EUPATH_0000162]']
         muscle_aches, muscle_aches_duration = duration_calculator(muscle_aches_duration, day_difference)
 
         seizures_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
         seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
 
-        temperature = round(patient['Temperature (C) [EUPATH_0000110]'].mean(), 1)
+        temperature = round(patient[temperature_string].mean(), 1)
         visit_date = current_date
         visit_type = "Scheduled visit"
 
@@ -238,12 +239,15 @@ for patient_id in patients:
     current_date += delta
     real_visit = 1
     day_difference = (visit_dates.iloc[real_visit] - current_date).days
+
     current_age = first_row[age_string] + 1/365 
     current_height = first_row[height_string]
     current_haemoglobin = first_row[haemoglobin_string]
+    current_temperature = first_row[temperature_string]
 
     daily_height_increase = linear_modelling(patient, 1, day_difference, height_string)
     daily_haemoglobin_increase = linear_modelling(patient, 1, day_difference, haemoglobin_string)
+    daily_temperature_increase = linear_modelling(patient, 1, day_difference, temperature_string)
 
     # go through each date from first visit to last visit and check if real visit exists on this date
     # if not, impute one
@@ -251,7 +255,13 @@ for patient_id in patients:
 
         if current_date == visit_dates.iloc[real_visit]:
 
+            # reset values to current
             current_age = patient.iloc[real_visit][age_string]
+            current_height = patient.iloc[real_visit][age_string]
+            current_haemoglobin = patient.iloc[real_visit][haemoglobin_string]
+            current_temperature = patient.iloc[real_visit][temperature_string]
+
+            # increment time tracker variables
             real_visit += 1
             observation_id += 1
             day_difference = (visit_dates.iloc[real_visit] - current_date).days
@@ -260,15 +270,16 @@ for patient_id in patients:
             daily_height_increase = linear_modelling(patient, real_visit, day_difference, height_string)
             daily_haemoglobin_increase =\
                 linear_modelling(patient, real_visit, day_difference, haemoglobin_string)
-            
+            daily_temperature_increase =\
+                linear_modelling(patient, real_visit, day_difference, temperature_string)
 
         else:
 
             # do imputation for this date
             observation_id += 1
 
-            abd_pain_duration = patient.iloc[real_visit]\
-                ['Abdominal pain duration (days) [EUPATH_0000154]']
+            abd_pain_duration =\
+                patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
             abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
 
             anorexia_duration = patient.iloc[real_visit]['Anorexia duration (days) [EUPATH_0000155]']
@@ -285,8 +296,8 @@ for patient_id in patients:
             fatigue_duration = patient.iloc[real_visit]['Fatigue duration (days) [EUPATH_0000158]']
             fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
             
-            febrile_duration = patient.iloc[real_visit]\
-                ['Fever, subjective duration (days) [EUPATH_0000164]']
+            febrile_duration =\
+                patient.iloc[real_visit]['Fever, subjective duration (days) [EUPATH_0000164]']
             febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
 
             headache_duration = patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
@@ -301,6 +312,27 @@ for patient_id in patients:
                 current_haemoglobin += daily_haemoglobin_increase
             else:
                 current_haemoglobin = daily_haemoglobin_increase[0]   # take the mean
+
+            jaundice_duration = patient.iloc[real_visit]['Jaundice duration (days) [EUPATH_0000160]']
+            jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
+
+            joint_pains_duration =\
+                patient.iloc[real_visit]['Joint pains duration (days) [EUPATH_0000161]']
+            joint_pains, joint_pains_duration =\
+                duration_calculator(joint_pains_duration, day_difference)
+
+            muscle_aches_duration =\
+                patient.iloc[real_visit]['Muscle aches duration (days) [EUPATH_0000162]']
+            muscle_aches, muscle_aches_duration =\
+                duration_calculator(muscle_aches_duration, day_difference)
+            
+            seizures_duration = patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
+            seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
+
+            if type(daily_temperature_increase) != list:
+                current_temperature += daily_temperature_increase
+            else:
+                current_temperature = daily_temperature_increase[0]   # take the mean
 
             day_difference -= 1
             current_age += 1/365
