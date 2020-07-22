@@ -4,13 +4,19 @@ from datetime import date, timedelta
 
 # reading in and assigning values
 data = pd.read_csv('isaFull.tsv', '\t')
-data['Visit date [EUPATH_0000091]'] = pd.to_datetime(data['Visit date [EUPATH_0000091]'])
+
+age_string = 'Age at visit (years) [EUPATH_0000113]'
+height_string = 'Height (cm) [EUPATH_0010075]'
+haemoglobin_string = 'Hemoglobin (g/dL) [EUPATH_0000047]'
+visit_date_string = 'Visit date [EUPATH_0000091]'
+
+data[visit_date_string] = pd.to_datetime(data[visit_date_string])
 
 data = data.assign(real=True)
 imputed_df = data[0:0]
 
-minmax_time = [min(data['Visit date [EUPATH_0000091]']),\
-               max(data['Visit date [EUPATH_0000091]'])]
+minmax_time = [min(data[visit_date_string]),\
+               max(data[visit_date_string])]
 
 # setting nan values
 admitting_hospital = np.nan
@@ -55,33 +61,36 @@ def duration_calculator(duration, day_difference):
 # checks whether column has same values for all rows, e.g. height
 def is_equal_throughout(column):
 
-    a = column.to_numpy() # s.values (pandas<0.24)
+    a = column.to_numpy()
     return (a[0] == a).all()
 
 
 # linearly model a variable between visits
-def linear_modelling(patient, same_throughout, real_visit, day_difference):
+def linear_modelling(patient, real_visit, day_difference, column):
 
-    if not same_throughout:
-        current_height = patient.iloc[real_visit - 1]['Height (cm) [EUPATH_0010075]']
-        new_height = patient.iloc[real_visit]['Height (cm) [EUPATH_0010075]']
-        daily_height_increase = (new_height - current_height)/day_difference
- 
-        return daily_height_increase
-    return 0
+    current_value = patient.iloc[real_visit - 1][column]
+    new_value = patient.iloc[real_visit][column]
+
+    if pd.isna(current_value) or pd.isna(new_value):
+        return [patient[column].mean()]
+    else:
+        if current_value != new_value:
+            daily_increase = (new_value - current_value)/day_difference
+            return daily_increase
+        return 0
 
 
 # imputing for each patient
 for patient_id in patients:
 
     patient = data[data['Participant_Id'] == patient_id].\
-                        sort_values(['Visit date [EUPATH_0000091]']).reset_index(drop=True)
+                        sort_values([visit_date_string]).reset_index(drop=True)
 
     # earliest start date
     series_start_date = minmax_time[0]
     
-    minmax_time_patient = [min(patient['Visit date [EUPATH_0000091]']),\
-                            max(patient['Visit date [EUPATH_0000091]'])]
+    minmax_time_patient = [min(patient[visit_date_string]),\
+                            max(patient[visit_date_string])]
     
     patient_start_date = minmax_time_patient[0]
     patient_end_date = minmax_time_patient[1]
@@ -93,10 +102,10 @@ for patient_id in patients:
     observation_id = first_row['Observation_Id']
     imputed_obs_id = observation_id - day_difference
     household_id = first_row['Household_Id']
-    age = first_row["Age at visit (years) [EUPATH_0000113]"]
+    age = first_row[age_string]
     current_age = age - day_difference/365
     current_date = series_start_date
-    same_height_throughout = is_equal_throughout(patient['Height (cm) [EUPATH_0010075]'])
+    same_height_throughout = is_equal_throughout(patient[height_string])
 
     # imputing from series start date to patient start date
     while current_date < patient_start_date:
@@ -125,10 +134,10 @@ for patient_id in patients:
         # set height as NAN for children and constant for adults (may change for children in the future)
         height = np.nan
         if same_height_throughout:
-            height = first_row['Height (cm) [EUPATH_0010075]']
+            height = first_row[height_string]
 
         # averaging haemoglobin
-        haemoglobin = round(patient['Hemoglobin (g/dL) [EUPATH_0000047]'].mean(), 1)
+        haemoglobin = round(patient[haemoglobin_string].mean(), 1)
 
         jaundice_duration = first_row['Jaundice duration (days) [EUPATH_0000160]']
         jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
@@ -225,35 +234,41 @@ for patient_id in patients:
 # =====================================================================================================
 
     # imputation between visit dates
-    visit_dates = patient['Visit date [EUPATH_0000091]']
+    visit_dates = patient[visit_date_string]
     current_date += delta
     real_visit = 1
     day_difference = (visit_dates.iloc[real_visit] - current_date).days
-    current_age = first_row['Age at visit (years) [EUPATH_0000113]'] + 1/365 
-    current_height = first_row['Height (cm) [EUPATH_0010075]']
-    daily_height_increase = linear_modelling(patient, same_height_throughout, 1, day_difference)       
+    current_age = first_row[age_string] + 1/365 
+    current_height = first_row[height_string]
+    current_haemoglobin = first_row[haemoglobin_string]
+
+    daily_height_increase = linear_modelling(patient, 1, day_difference, height_string)
+    daily_haemoglobin_increase = linear_modelling(patient, 1, day_difference, haemoglobin_string)
 
     # go through each date from first visit to last visit and check if real visit exists on this date
     # if not, impute one
     while real_visit < len(visit_dates) - 1:
 
-        print(real_visit, len(visit_dates))
-
         if current_date == visit_dates.iloc[real_visit]:
-            current_age = patient.iloc[real_visit]['Age at visit (years) [EUPATH_0000113]']
+
+            current_age = patient.iloc[real_visit][age_string]
             real_visit += 1
             observation_id += 1
             day_difference = (visit_dates.iloc[real_visit] - current_date).days
 
-            daily_height_increase = linear_modelling(patient, same_height_throughout, 1, day_difference)       
-
+            # check if same values between these visits & linearly model values between visits
+            daily_height_increase = linear_modelling(patient, real_visit, day_difference, height_string)
+            daily_haemoglobin_increase =\
+                linear_modelling(patient, real_visit, day_difference, haemoglobin_string)
+            
 
         else:
 
             # do imputation for this date
             observation_id += 1
 
-            abd_pain_duration = patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
+            abd_pain_duration = patient.iloc[real_visit]\
+                ['Abdominal pain duration (days) [EUPATH_0000154]']
             abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
 
             anorexia_duration = patient.iloc[real_visit]['Anorexia duration (days) [EUPATH_0000155]']
@@ -277,25 +292,28 @@ for patient_id in patients:
             headache_duration = patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
             headache, headache_duration = duration_calculator(headache_duration, day_difference)
 
-            # check if same_height_throughout & linearly model height between visits
-            if same_height_throughout:
-                current_height = patient.iloc[real_visit]['Height (cm) [EUPATH_0010075]']
-            else:
+            if type(daily_height_increase) != list:
                 current_height += daily_height_increase
+            else:
+                current_height = daily_height_increase[0]   # take the mean
+
+            if type(daily_haemoglobin_increase) != list:
+                current_haemoglobin += daily_haemoglobin_increase
+            else:
+                current_haemoglobin = daily_haemoglobin_increase[0]   # take the mean
 
             day_difference -= 1
             current_age += 1/365
 
-        print(current_height, daily_height_increase)
         current_date += delta
 
     break
 
 '''
-column = "Height (cm) [EUPATH_0010075]"
-diagnosis = data[["Observation_Id", "Participant_Id", column, 'Visit date [EUPATH_0000091]']]
+column = height_string
+diagnosis = data[["Observation_Id", "Participant_Id", column, visit_date_string]]
 print(diagnosis)
-print(patient[["Observation_Id", "Participant_Id", column, 'Visit date [EUPATH_0000091]']])
+print(patient[["Observation_Id", "Participant_Id", column, visit_date_string]])
 
 print(diagnosis[diagnosis[column].isnull()])
 print(diagnosis[column].unique())
