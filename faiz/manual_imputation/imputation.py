@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
+import time
 from datetime import date, timedelta
+
+start_time = time.time()
 
 # reading in and assigning values
 data = pd.read_csv('isaFull.tsv', '\t')
@@ -114,9 +117,11 @@ for patient_id in patients:
     patient_start_date = minmax_time_patient[0]
     patient_end_date = minmax_time_patient[1]
 
+    # Round 1
     day_difference = (patient_start_date - series_start_date).days
 
     first_row = patient.iloc[0]
+    last_row = patient.iloc[-1]
 
     observation_id = first_row['Observation_Id']
     imputed_obs_id = observation_id - day_difference
@@ -179,7 +184,7 @@ for patient_id in patients:
         # weight NAN for children, averaging for adults
         weight = np.nan
         if current_age > 20:
-            weight = round(patient[weight_string].mean(), 1)
+            weight = round(patient[weight_string].mean() * 2) / 2
 
         imputed_row = {
             "Observation_Id": imputed_obs_id, 
@@ -249,6 +254,7 @@ for patient_id in patients:
 
 # =====================================================================================================
 
+    # Round 2
     # imputation between visit dates
     visit_dates = patient[visit_date_string]
     current_date += delta
@@ -283,7 +289,6 @@ for patient_id in patients:
 
             # increment time tracker variables
             real_visit += 1
-            observation_id += 1
             day_difference = (visit_dates.iloc[real_visit] - current_date).days
 
             # check if same values between these visits & linearly model values between visits
@@ -299,8 +304,6 @@ for patient_id in patients:
         else:
 
             # do imputation for this date
-            observation_id += 1
-
             abd_pain_duration =\
                 patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
             abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
@@ -413,17 +416,41 @@ for patient_id in patients:
 
             # append imputed row to patient
             imputed_patient = imputed_patient.append(imputed_row, ignore_index=True)
-
             day_difference -= 1
             current_age += 1/365
 
+        observation_id += 1
         current_date += delta
 
     # display results of first two rounds so far
     #pd.set_option('display.max_rows', None)
     #diagnosis = imputed_patient[["Observation_Id", weight_string, visit_date_string, 'real']]
     #print(diagnosis.sort_values([visit_date_string]))
+
+# ================================================================================================
+
+    # Round 3
+    # imputation after last visit date
+
+    observation_id += 1
+    current_age = last_row[age_string] + 1/365
+    current_date += delta
+
+    abd_pain = anorexia = cough = diarrhoea = fatigue = febrile = headache =\
+        jaundice = joints_pain = muscle_aches = seizures = vomiting = 'Unable to assess'
+
+    abd_pain_duration = anorexia_duration = cough_duration = fatigue_duration =\
+        febrile_duration = headache_duration = joints_pain_duration =\
+        muscle_aches_duration = seizures_duration = vomiting_duration = 0
+
+    while current_date <= series_end_date:
+
+        current_date += delta
+
+
     break
+
+print("--- %s seconds ---" % (time.time() - start_time))
 
 '''
 column = height_string
