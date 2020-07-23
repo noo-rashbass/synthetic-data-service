@@ -1,0 +1,73 @@
+participant ID and household ID stay the same
+abdominal pain - 'unable to assess', or yes if from future visit
+abdominal pain duration - 0 if unable to assess, compute from future visit duration otherwise
+admitting hospital - NA
+age imputation in file
+anorexia - 'unable to assess', or yes if from future visit
+anorexia duration - 0 if unable to assess, compute from future visit duration otherwise
+asex plasmod density - NA
+asex plasmod present - NA if density NA, positive if density > 0
+basis of complicated diagnosis - NA
+complicated malaria - NA
+cough - 'unable to assess', or yes if from future visit
+cough duration - 0 if unable to assess, compute from future visit duration otherwise
+days since enrollment - NA outside range, calculate otherwise
+Diagnosis at hospitalization - NA
+diarrhoea - 'unable to assess', or yes if from future visit
+diarrhoea duration - 0 if unable to assess, compute from future visit otherwise
+fatigue - 'unable to assess', or yes if from future visit
+fatigue duration - 0 if unable to assess, compute from future visit otherwise
+febrile - 'unable to assess', or yes if from future visit
+febrile duration - 0 if unable to assess, compute from future visit otherwise
+headache - 'unable to assess', or yes if from future visit
+headache duration - 0 if unable to assess, compute from future visit otherwise
+height - TODO (maybe NA or extrapolate)
+haemoglobin - linerarly interpolate between values, otherwise averageing
+hospital admission date - NA
+hospital discharge date - NA
+ITN last night - NA
+jaundice - 'unable to assess', or yes if from future visit
+jaundice duration - 0 if unable to assess, compute from future visit otherwise
+joint pains - 'unable to assess', or yes if from future visit
+joint pains duration - 0 if unable to assess, compute from future visit otherwise
+malaria diagnosis - NA
+Malaria diagnosis and parasite status - 'Blood smear not indicated' 
+(TODO)                                  'Blood smear negative / LAMP not done'
+                                        'Blood smear negative / LAMP negative'
+                                        'Blood smear positive / no malaria'
+                                        'Symptomatic malaria'
+                                        'Blood smear negative / LAMP positive'
+                                        'Blood smear indicated but not done'
+                                        nan
+malaria treatment - no malaria medication given
+muscle aches - 'unable to assess', or yes if from future visit
+muscle aches duration - 0 if unable to assess, compute from future visit otherwise
+non-malaria medication - NA
+other diagnosis - NA
+other medical complaint - NA
+Plasmodium gametocytes present - NA
+seizures - 'unable to assess', or yes if from future visit
+seizures duration - 0 if unable to assess, compute from future visit otherwise
+severe malaria criteria - NA
+subjective fever - TODO: no, yes, NA
+Submicroscopic Plasmodium present - NA
+temperature - interpolate linearly between values, extend backwards and forwards
+visit date - incrementing by 1 every day from earliest start date to latest end date
+visit type - scheduled
+vomiting - 'unable to assess', or yes if from future visit
+vomiting duration - 0 if unable to assess, compute from future visit otherwise
+weight - linearly interpolate between values, otherwise averaging
+
+TODOS
+
+height - (maybe NA or extrapolate)
+Malaria diagnosis and parasite status - 'Blood smear not indicated' 
+(TODO)                                  'Blood smear negative / LAMP not done'
+                                        'Blood smear negative / LAMP negative'
+                                        'Blood smear positive / no malaria'
+                                        'Symptomatic malaria'
+                                        'Blood smear negative / LAMP positive'
+                                        'Blood smear indicated but not done'
+                                        nan
+subjective fever - no, yes, NA
+weight - linearly interpolate between values, but what before and after?
