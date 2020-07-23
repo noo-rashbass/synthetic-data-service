@@ -29,6 +29,7 @@ from __future__ import print_function
 import argparse
 import numpy as np
 import warnings
+import sys
 warnings.filterwarnings("ignore")
 
 # 1. TimeGAN model
@@ -82,7 +83,8 @@ def main (args):
   
   generated_data = timegan(ori_data, parameters)   
   print('Finish Synthetic Data Generation')
-  
+  np.save('gen_stock.npy', generated_data)
+  sys.exit()
   ## Performance metrics   
   # Output initialization
   metric_results = dict()

@@ -79,7 +79,7 @@ def extract_time (data):
   return time, max_seq_len
 
 
-def rnn_cell(module_name, hidden_dim):
+def rnn_cell(module_name, hidden_dim, return_sequences=False, input_shape=None):
   """Basic RNN Cell.
     
   Args:
@@ -92,13 +92,13 @@ def rnn_cell(module_name, hidden_dim):
   
   # GRU
   if (module_name == 'gru'):
-    rnn_cell = tf.nn.rnn_cell.GRUCell(num_units=hidden_dim, activation=tf.nn.tanh)
+    rnn_cell = tf.keras.layers.GRU(units=hidden_dim, activation=tf.nn.tanh, return_sequences=return_sequences, input_shape = input_shape)
   # LSTM
   elif (module_name == 'lstm'):
-    rnn_cell = tf.contrib.rnn.BasicLSTMCell(num_units=hidden_dim, activation=tf.nn.tanh)
+    rnn_cell = tf.keras.layers.LSTMCell(units=hidden_dim, activation=tf.nn.tanh, return_sequences=return_sequences, input_shape = input_shape)
   # LSTM Layer Normalization
   elif (module_name == 'lstmLN'):
-    rnn_cell = tf.contrib.rnn.LayerNormBasicLSTMCell(num_units=hidden_dim, activation=tf.nn.tanh)
+    rnn_cell =tf.keras.layers.LSTM(units=hidden_dim, activation=tf.nn.tanh, return_sequences=return_sequences, input_shape = input_shape)
   return rnn_cell
 
 
