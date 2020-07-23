@@ -10,7 +10,7 @@
 # The attacker is smart and will perform feature selection or weighting.
 # We evaluate the attacker's success by their classification precision and classification sensitivity for different s and k values
 
-# For the time being, also limit to purly categorical columns. Can use non KNN for numerical, or bin numericals
+# For the time being, also limit to purely categorical columns. Can use non KNN for numerical, or bin numericals
 
 # Later, to actually evauate the privacy of our output, we assume the publicly available data is the 'real' data
 # (ignoring the anonymisation/jittering)
@@ -32,7 +32,7 @@ from matplotlib import pyplot as plt
 PROPORTION_REAL = 0.2
 PROPORTION_COMPROMISED = 1
 COLUMNS = CATEGORICALS
-s = 5 # Attacker is likely to be successful if there's enough attributes remaining in each row
+s = 5 # Number of missing attributes per row. Attacker is likely to be successful if there's enough attributes remaining in each row
 k = 5
 
 ## ENCODE CATEGORIES --------------------------------------------
