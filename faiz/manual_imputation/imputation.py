@@ -103,6 +103,7 @@ for patient_id in patients:
 
     patient = data[data['Participant_Id'] == patient_id].\
                         sort_values([visit_date_string]).reset_index(drop=True)
+    imputed_patient = patient
 
     # earliest start date
     series_start_date = minmax_time[0]
@@ -222,8 +223,8 @@ for patient_id in patients:
             "Muscle aches duration (days) [EUPATH_0000162]": muscle_aches_duration,
             "Non-malaria medication [EUPATH_0000059]": non_malaria_medication,
             "Other diagnosis [EUPATH_0000317]": other_diagnosis,
-            "Other medical complaint [EUPATH_0020002]": other_medical_complaint,,
-            "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present
+            "Other medical complaint [EUPATH_0020002]": other_medical_complaint,
+            "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present,
             "Seizures [SYMP_0000124]": seizures,
             "Seizures duration (days) [EUPATH_0000163]": seizures_duration,
             "Severe malaria criteria [EUPATH_0000046]": severe_malaria_criteria,
@@ -238,7 +239,8 @@ for patient_id in patients:
             "real": False
         }
 
-        #patient = patient.append(imputed_row, ignore_index=True)   # append imputed row to patient
+        # append imputed row to patient
+        imputed_patient = imputed_patient.append(imputed_row, ignore_index=True)
         imputed_obs_id += 1
         current_age += 1/365
 
@@ -268,7 +270,7 @@ for patient_id in patients:
 
     # go through each date from first visit to last visit and check if real visit exists on this date
     # if not, impute one
-    while real_visit < len(visit_dates) - 1:
+    while current_date < patient_end_date:
 
         if current_date == visit_dates.iloc[real_visit]:
 
@@ -278,7 +280,6 @@ for patient_id in patients:
             current_haemoglobin = patient.iloc[real_visit][haemoglobin_string]
             current_temperature = patient.iloc[real_visit][temperature_string]
             current_weight = patient.iloc[real_visit][weight_string]
-
 
             # increment time tracker variables
             real_visit += 1
@@ -394,8 +395,8 @@ for patient_id in patients:
                 "Muscle aches duration (days) [EUPATH_0000162]": muscle_aches_duration,
                 "Non-malaria medication [EUPATH_0000059]": non_malaria_medication,
                 "Other diagnosis [EUPATH_0000317]": other_diagnosis,
-                "Other medical complaint [EUPATH_0020002]": other_medical_complaint,,
-                "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present
+                "Other medical complaint [EUPATH_0020002]": other_medical_complaint,
+                "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present,
                 "Seizures [SYMP_0000124]": seizures,
                 "Seizures duration (days) [EUPATH_0000163]": seizures_duration,
                 "Severe malaria criteria [EUPATH_0000046]": severe_malaria_criteria,
@@ -410,11 +411,18 @@ for patient_id in patients:
                 "real": False
             }
 
+            # append imputed row to patient
+            imputed_patient = imputed_patient.append(imputed_row, ignore_index=True)
+
             day_difference -= 1
             current_age += 1/365
 
         current_date += delta
 
+    # display results of first two rounds so far
+    #pd.set_option('display.max_rows', None)
+    #diagnosis = imputed_patient[["Observation_Id", weight_string, visit_date_string, 'real']]
+    #print(diagnosis.sort_values([visit_date_string]))
     break
 
 '''
