@@ -68,16 +68,16 @@ def timegan(ori_data, parameters):
         embedder_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
         
-        # e_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers-1)])
-    
-        # embedder_model = tf.keras.Sequential([
-            #needs some code for the first layer with diff input size   
-            # but this does not solve the "multiple" output shape issue??               
-        #    tf.keras.layers.RNN(e_cell, return_sequences=True), 
-                       
-        #    tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
-
-        # ])
+##        e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers-1)])
+##        embedder_model = tf.keras.Sequential([
+##
+##            rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len,dim)),
+##                                   
+##            tf.keras.layers.RNN(e_cell, return_sequences=True), 
+##                       
+##            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
+##
+##          ])
 
         return embedder_model
 
@@ -96,14 +96,15 @@ def timegan(ori_data, parameters):
             recovery_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         recovery_model.add(tf.keras.layers.Dense(dim, activation='sigmoid'))
 
-        # r_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
-        # recovery_model = tf.keras.Sequential([
-                                   
-        #     tf.keras.layers.RNN(r_cell, return_sequences=True), 
-                       
-        #     tf.keras.layers.Dense(dim, activation=tf.nn.sigmoid)
-
-        #   ])
+##        r_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers)])
+##        recovery_model = tf.keras.Sequential([
+##            
+##                        
+##            tf.keras.layers.RNN(r_cell, return_sequences = True),
+##                       
+##            tf.keras.layers.Dense(dim, activation=tf.nn.sigmoid)
+##
+##          ])
 
         return recovery_model
   
@@ -123,14 +124,15 @@ def timegan(ori_data, parameters):
             generator_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         generator_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
-        # g_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
-        # generator_model = tf.keras.Sequential([
-                                   
-        #     tf.keras.layers.RNN(g_cell, return_sequences=True), 
-                       
-        #     tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
+##        e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh) for _ in range(num_layers)])
+##        generator_model = tf.keras.Sequential([
+##                                    
+##            tf.keras.layers.RNN(e_cell, return_sequences=True),
+##                       
+##            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
+##
+##          ])
 
-        #   ])
 
         return generator_model
 
@@ -149,14 +151,14 @@ def timegan(ori_data, parameters):
             supervisor_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         supervisor_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
-        # s_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim) for _ in range(num_layers-1)])
-        # supervisor_model = tf.keras.Sequential([
-                                   
-        #     tf.keras.layers.RNN(s_cell, return_sequences=True), 
-                       
-        #     tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
-
-        #   ])
+##        e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers-1)])
+##        supervisor_model = tf.keras.Sequential([
+##                       
+##            tf.keras.layers.RNN(e_cell, return_sequences=True),
+##                       
+##            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
+##
+##          ])
 
         return supervisor_model
     
@@ -175,14 +177,14 @@ def timegan(ori_data, parameters):
             discriminator_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         discriminator_model.add(tf.keras.layers.Dense(1, activation=None))
 
-        # d_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
-        # discriminator_model = tf.keras.Sequential([
-                                   
-        #     tf.keras.layers.RNN(d_cell, return_sequences=True), 
-                       
-        #     tf.keras.layers.Dense(dim, activation=None)
-
-        #   ])
+##        d_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh) for _ in range(num_layers)])
+##        discriminator_model = tf.keras.Sequential([
+##                       
+##            tf.keras.layers.RNN(d_cell),
+##                       
+##            tf.keras.layers.Dense(1, activation=None)
+##
+##          ])
 
         return discriminator_model
 
