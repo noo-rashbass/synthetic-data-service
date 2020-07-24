@@ -16,8 +16,8 @@ visit_date_string = 'Visit date [EUPATH_0000091]'
 visit_type = "Scheduled visit"
 weight_string = 'Weight (kg) [EUPATH_0000732]'
 
-columns = [
-    'real', 'Observation_Id', 'Participant_Id', 'Household_Id', 'Abdominal pain [HP_0002027]',
+cols = [
+    'Observation_Id', 'Participant_Id', 'Household_Id', 'Abdominal pain [HP_0002027]',
 	'Abdominal pain duration (days) [EUPATH_0000154]', 'Admitting hospital [EUPATH_0000318]',
     age_string, 'Anorexia [SYMP_0000523]', 'Anorexia duration (days) [EUPATH_0000155]',
 	'Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]',
@@ -45,15 +45,13 @@ columns = [
 	'Subjective fever [EUPATH_0000100]',
 	'Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]',
 	temperature_string, visit_date_string, 'Visit type [EUPATH_0000311]', 'Vomiting [HP_0002013]',
-	'Vomiting duration (days) [EUPATH_0000165]', weight_string
+	'Vomiting duration (days) [EUPATH_0000165]', weight_string, 'real'
 ]
 
 data[visit_date_string] = pd.to_datetime(data[visit_date_string])
 
 data = data.assign(real=1000)
 imputed_list = []
-imputed_rows = np.array([])
-
 minmax_time = [min(data[visit_date_string]),\
                max(data[visit_date_string])]
 
@@ -168,7 +166,8 @@ for patient_id in patients:
     average_temperature = round(patient[temperature_string].mean(), 1)
     average_weight = round(patient[weight_string].mean() * 2) / 2
 
-    # set height as NAN for children and constant for adults (may change for children in the future)
+    # set height as NAN for children and constant for adults
+    # (may change for children in the future)
     height = np.nan
     if same_height_throughout:
         height = first_row[height_string]
@@ -201,10 +200,12 @@ for patient_id in patients:
         jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
 
         joint_pains_duration = first_row['Joint pains duration (days) [EUPATH_0000161]']
-        joint_pains, joint_pains_duration = duration_calculator(joint_pains_duration, day_difference)
+        joint_pains, joint_pains_duration =\
+            duration_calculator(joint_pains_duration, day_difference)
 
         muscle_aches_duration = first_row['Muscle aches duration (days) [EUPATH_0000162]']
-        muscle_aches, muscle_aches_duration = duration_calculator(muscle_aches_duration, day_difference)
+        muscle_aches, muscle_aches_duration =\
+            duration_calculator(muscle_aches_duration, day_difference)
 
         seizures_duration = first_row['Seizures duration (days) [EUPATH_0000163]']
         seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
@@ -241,7 +242,7 @@ for patient_id in patients:
         current_date += delta
         day_difference -= 1
 
-# =====================================================================================================
+# ==================================================================================
 
     # Round 2
     # imputation between visit dates
@@ -297,7 +298,8 @@ for patient_id in patients:
                 patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
             abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
 
-            anorexia_duration = patient.iloc[real_visit]['Anorexia duration (days) [EUPATH_0000155]']
+            anorexia_duration =\
+                patient.iloc[real_visit]['Anorexia duration (days) [EUPATH_0000155]']
             anorexia, anorexia_duration = duration_calculator(anorexia_duration, day_difference)
 
             cough_duration = patient.iloc[real_visit]['Cough duration (days) [EUPATH_0000156]']
@@ -305,23 +307,29 @@ for patient_id in patients:
 
             days_since_enrollment = (current_date - patient_start_date).days
 
-            diarrhoea_duration = patient.iloc[real_visit]['Diarrhea duration (days) [EUPATH_0000157]']
-            diarrhoea, diarrhoea_duration = duration_calculator(diarrhoea_duration, day_difference)
+            diarrhoea_duration =\
+                patient.iloc[real_visit]['Diarrhea duration (days) [EUPATH_0000157]']
+            diarrhoea, diarrhoea_duration =\
+                duration_calculator(diarrhoea_duration, day_difference)
 
-            fatigue_duration = patient.iloc[real_visit]['Fatigue duration (days) [EUPATH_0000158]']
+            fatigue_duration =\
+                patient.iloc[real_visit]['Fatigue duration (days) [EUPATH_0000158]']
             fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
 
             febrile_duration =\
                 patient.iloc[real_visit]['Fever, subjective duration (days) [EUPATH_0000164]']
             febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
 
-            headache_duration = patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
+            headache_duration =\
+                patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
             headache, headache_duration = duration_calculator(headache_duration, day_difference)
 
             current_height = apply_linear_modelling(current_height, daily_height_increase)
-            current_haemoglobin = apply_linear_modelling(current_haemoglobin, daily_haemoglobin_change)
+            current_haemoglobin =\
+                apply_linear_modelling(current_haemoglobin, daily_haemoglobin_change)
 
-            jaundice_duration = patient.iloc[real_visit]['Jaundice duration (days) [EUPATH_0000160]']
+            jaundice_duration =\
+                patient.iloc[real_visit]['Jaundice duration (days) [EUPATH_0000160]']
             jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
 
             joint_pains_duration =\
@@ -334,18 +342,21 @@ for patient_id in patients:
             muscle_aches, muscle_aches_duration =\
                 duration_calculator(muscle_aches_duration, day_difference)
 
-            seizures_duration = patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
+            seizures_duration =\
+                patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
             seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
 
-            current_temperature = apply_linear_modelling(current_temperature, daily_temperature_change)
+            current_temperature =\
+                apply_linear_modelling(current_temperature, daily_temperature_change)
 
-            vomiting_duration = patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
+            vomiting_duration =\
+                patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
             vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
 
             current_weight = apply_linear_modelling(current_weight, daily_weight_change)
 
             imputed_row = [
-                imputed_obs_id, patient_id, household_id, abd_pain, abd_pain_duration,
+                observation_id, patient_id, household_id, abd_pain, abd_pain_duration,
                 admitting_hospital, round(current_age, 2), anorexia, anorexia_duration,
                 ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
                 cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
@@ -369,7 +380,7 @@ for patient_id in patients:
         observation_id += 1
         current_date += delta
 
-# ================================================================================================
+# ================================================================================
 
     # Round 3
     # imputation after last visit date
@@ -387,7 +398,8 @@ for patient_id in patients:
 
     days_since_enrollment = np.nan
 
-    # set height as NAN for children and constant for adults (may change for children in the future)
+    # set height as NAN for children and constant for adults 
+    # (may change for children in the future)
     height = np.nan
     if same_height_throughout:
         height = first_row[height_string]
@@ -395,7 +407,7 @@ for patient_id in patients:
     while current_date <= series_end_date:
 
         imputed_row = [
-            imputed_obs_id, patient_id, household_id, abd_pain, abd_pain_duration,
+            observation_id, patient_id, household_id, abd_pain, abd_pain_duration,
             admitting_hospital, round(current_age, 2), anorexia, anorexia_duration,
             ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
             cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
@@ -416,23 +428,17 @@ for patient_id in patients:
         observation_id += 1
         current_date += delta
 
-    break
 
 imputed_rows = np.array(imputed_list)
-print(imputed_rows)
-imputed_data = pd.DataFrame(imputed_rows, columns)
-data.append(imputed_data, ignore_index=True)
+imputed_data = pd.DataFrame(imputed_rows, columns=cols)
+data = data.append(imputed_data, ignore_index=True)
 
-cols = list(data.columns)
-cols = [cols[-1]] + cols[:-1]
-data = data[cols]
+# switching 'real' to first column rather than last for easier masking
+c = list(data.columns)
+c = [c[-1]] + c[:-1]
+data = data[c]
 
-# display results of first two rounds so far
-#pd.set_option('display.max_rows', None)
-#diagnosis = imputed_patient[["Observation_Id", height_string, visit_date_string, 'real']]
-#print(diagnosis.sort_values([visit_date_string]))
+data = data.sort_values(['Observation_Id'])
+data.to_csv('refactored.tsv', sep='\t', index=False)
 
-imputed_patient = imputed_patient.sort_values([visit_date_string])
-imputed_patient.to_csv('new_imputed.tsv', sep='\t', index=False)
-
-print("--- %s seconds ---" % (time.time() - start_time))
+#print("--- %s seconds ---" % (time.time() - start_time))
