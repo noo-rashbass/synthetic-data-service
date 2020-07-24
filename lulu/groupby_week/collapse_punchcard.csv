@@ -1,0 +1,56 @@
+Column,JoinText,RoundAverage,ContinuousAverage,YesNo,Same,MakeList,Column has been accounted for?
+Observation_Id,,,,,,1,1
+Participant_Id,,,,,1,,1
+Household_Id,,,,,1,,1
+Abdominal pain [HP_0002027],,,,1,,,1
+Abdominal pain duration (days) [EUPATH_0000154],,1,,,,,1
+Admitting hospital [EUPATH_0000318],1,,,,,,1
+Age at visit (years) [EUPATH_0000113],,,1,,,,1
+Anorexia [SYMP_0000523],,,,1,,,1
+Anorexia duration (days) [EUPATH_0000155],,1,,,,,1
+"Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]",,,1,,,,1
+"Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]",,,,1,,,1
+Basis of complicated diagnosis [EUPATH_0000316],1,,,,,,1
+Complicated malaria [EUPATH_0000040],,,,1,,,1
+Cough [SYMP_0000614],,,,1,,,1
+Cough duration (days) [EUPATH_0000156],,1,,,,,1
+Days since enrollment [EUPATH_0000191],,1,,,,,1
+Diagnosis at hospitalization [EUPATH_0000638],1,,,,,,1
+Diarrhea [DOID_13250],,,,1,,,1
+Diarrhea duration (days) [EUPATH_0000157],,1,,,,,1
+Fatigue [SYMP_0019177],,,,1,,,1
+Fatigue duration (days) [EUPATH_0000158],,1,,,,,1
+Febrile [EUPATH_0000097],,,,1,,,1
+"Fever, subjective duration (days) [EUPATH_0000164]",,1,,,,,1
+Headache [HP_0002315],,,,1,,,1
+Headache duration (days) [EUPATH_0000159],,1,,,,,1
+Height (cm) [EUPATH_0010075],,,1,,,,1
+Hemoglobin (g/dL) [EUPATH_0000047],,,1,,,,1
+Hospital admission date [EUPATH_0000319],,,,,,1,1
+Hospital discharge date [EUPATH_0000320],,,,,,1,1
+ITN last night [EUPATH_0000216],,,,1,,,1
+Jaundice [HP_0000952],,,,1,,,1
+Jaundice duration (days) [EUPATH_0000160],,1,,,,,1
+Joint pains [SYMP_0000064],,,,1,,,1
+Joint pains duration (days) [EUPATH_0000161],,1,,,,,1
+Malaria diagnosis [EUPATH_0000090],,,,1,,,1
+Malaria diagnosis and parasite status [EUPATH_0000338],1,,,,,,1
+Malaria treatment [EUPATH_0000740],1,,,,,,1
+Muscle aches [EUPATH_0000252],,,,1,,,1
+Muscle aches duration (days) [EUPATH_0000162],,1,,,,,1
+Non-malaria medication [EUPATH_0000059],1,,,,,,1
+Other diagnosis [EUPATH_0000317],1,,,,,,1
+Other medical complaint [EUPATH_0020002],1,,,,,,1
+"Plasmodium gametocytes present, by microscopy [EUPATH_0000207]",,,,1,,,1
+Seizures [SYMP_0000124],,,,1,,,1
+Seizures duration (days) [EUPATH_0000163],,1,,,,,1
+Severe malaria criteria [EUPATH_0000046],1,,,,,,1
+Subjective fever [EUPATH_0000100],,,,1,,,1
+"Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]",,,,1,,,1
+Temperature (C) [EUPATH_0000110],,,1,,,,1
+Visit date [EUPATH_0000091],,,,,,1,1
+Visit type [EUPATH_0000311],1,,,,,,1
+Vomiting [HP_0002013],,,,1,,,1
+Vomiting duration (days) [EUPATH_0000165],,1,,,,,1
+Weight (kg) [EUPATH_0000732],,,1,,,,1
+,,,,,,,
