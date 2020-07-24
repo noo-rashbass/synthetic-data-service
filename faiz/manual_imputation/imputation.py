@@ -16,10 +16,43 @@ visit_date_string = 'Visit date [EUPATH_0000091]'
 visit_type = "Scheduled visit"
 weight_string = 'Weight (kg) [EUPATH_0000732]'
 
+columns = [
+    'real', 'Observation_Id', 'Participant_Id', 'Household_Id', 'Abdominal pain [HP_0002027]',
+	'Abdominal pain duration (days) [EUPATH_0000154]', 'Admitting hospital [EUPATH_0000318]',
+    age_string, 'Anorexia [SYMP_0000523]', 'Anorexia duration (days) [EUPATH_0000155]',
+	'Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]',
+	'Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]',
+	'Basis of complicated diagnosis [EUPATH_0000316]', 'Complicated malaria [EUPATH_0000040]',
+	'Cough [SYMP_0000614]', 'Cough duration (days) [EUPATH_0000156]',
+    'Days since enrollment [EUPATH_0000191]', 'Diagnosis at hospitalization [EUPATH_0000638]',
+    'Diarrhea [DOID_13250]', 'Diarrhea duration (days) [EUPATH_0000157]',
+    'Fatigue [SYMP_0019177]', 'Fatigue duration (days) [EUPATH_0000158]',
+    'Febrile [EUPATH_0000097]', 'Fever, subjective duration (days) [EUPATH_0000164]',
+    'Headache [HP_0002315]', 'Headache duration (days) [EUPATH_0000159]',
+    height_string, haemoglobin_string,
+	'Hospital admission date [EUPATH_0000319]', 'Hospital discharge date [EUPATH_0000320]',
+	'ITN last night [EUPATH_0000216]',
+    'Jaundice [HP_0000952]', 'Jaundice duration (days) [EUPATH_0000160]',
+    'Joint pains [SYMP_0000064]', 'Joint pains duration (days) [EUPATH_0000161]',
+    'Malaria diagnosis [EUPATH_0000090]',
+    'Malaria diagnosis and parasite status [EUPATH_0000338]',
+    'Malaria treatment [EUPATH_0000740]',
+    'Muscle aches [EUPATH_0000252]', 'Muscle aches duration (days) [EUPATH_0000162]',
+    'Non-malaria medication [EUPATH_0000059]',
+	'Other diagnosis [EUPATH_0000317]', 'Other medical complaint [EUPATH_0020002]',
+	'Plasmodium gametocytes present, by microscopy [EUPATH_0000207]', 'Seizures [SYMP_0000124]',
+	'Seizures duration (days) [EUPATH_0000163]', 'Severe malaria criteria [EUPATH_0000046]',
+	'Subjective fever [EUPATH_0000100]',
+	'Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]',
+	temperature_string, visit_date_string, 'Visit type [EUPATH_0000311]', 'Vomiting [HP_0002013]',
+	'Vomiting duration (days) [EUPATH_0000165]', weight_string
+]
+
 data[visit_date_string] = pd.to_datetime(data[visit_date_string])
 
 data = data.assign(real=1000)
-imputed_df = data[0:0]
+imputed_list = []
+imputed_rows = np.array([])
 
 minmax_time = [min(data[visit_date_string]),\
                max(data[visit_date_string])]
@@ -106,7 +139,6 @@ for patient_id in patients:
 
     patient = data[data['Participant_Id'] == patient_id].\
                         sort_values([visit_date_string]).reset_index(drop=True)
-    imputed_patient = patient
 
     # earliest start date
     series_start_date = minmax_time[0]
@@ -185,66 +217,24 @@ for patient_id in patients:
         if current_age > 20:
             weight = average_weight
 
-        imputed_row = {
-            "Observation_Id": imputed_obs_id, 
-            "Participant_Id": patient_id,
-            "Household_Id": household_id,
-            "Abdominal pain [HP_0002027]": abd_pain,
-            "Abdominal pain duration (days) [EUPATH_0000154]": abd_pain_duration,
-            "Admitting hospital [EUPATH_0000318]": admitting_hospital,
-            "Age at visit (years) [EUPATH_0000113]": round(current_age, 2),
-            "Anorexia [SYMP_0000523]": anorexia,
-            "Anorexia duration (days) [EUPATH_0000155]": anorexia_duration,
-            "Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]": ax_plas_density,
-            "Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]": ax_plas_present,
-            "Basis of complicated diagnosis [EUPATH_0000316]": complex_diagnosis_basis,
-            "Complicated malaria [EUPATH_0000040]": complicated_malaria,
-            "Cough [SYMP_0000614]": cough,
-            "Cough duration (days) [EUPATH_0000156]": cough_duration,
-            "Days since enrollment [EUPATH_0000191]": days_since_enrollment,
-            "Diagnosis at hospitalization [EUPATH_0000638]": diagnosis_at_hospital,
-            "Diarrhea [DOID_13250]": diarrhoea,
-            "Diarrhea duration (days) [EUPATH_0000157]": diarrhoea_duration,
-            "Fatigue [SYMP_0019177]": fatigue,
-            "Fatigue duration (days) [EUPATH_0000158]": fatigue_duration,
-            "Febrile [EUPATH_0000097]": febrile,
-            "Fever, subjective duration (days) [EUPATH_0000164]": febrile_duration,
-            "Headache [HP_0002315]": headache,
-            "Headache duration (days) [EUPATH_0000159]": headache_duration,
-            "Height (cm) [EUPATH_0010075]": str(int(height)),
-            "Hemoglobin (g/dL) [EUPATH_0000047]": average_haemoglobin,
-            "Hospital admission date [EUPATH_0000319]": hospital_admission_date,
-            "Hospital discharge date [EUPATH_0000320]": hospital_discharge_date,
-            "ITN last night [EUPATH_0000216]": itn,
-            "Jaundice [HP_0000952]": jaundice,
-            "Jaundice duration (days) [EUPATH_0000160]": jaundice_duration,
-            "Joint pains [SYMP_0000064]": joint_pains,
-            "Joint pains duration (days) [EUPATH_0000161]": joint_pains_duration,
-            "Malaria diagnosis [EUPATH_0000090]": malaria_diagnosis,
-            "Malaria diagnosis and parasite status [EUPATH_0000338]": malaria_diagnosis_parasite,
-            "Malaria treatment [EUPATH_0000740]": malaria_treatment,
-            "Muscle aches [EUPATH_0000252]": muscle_aches,
-            "Muscle aches duration (days) [EUPATH_0000162]": muscle_aches_duration,
-            "Non-malaria medication [EUPATH_0000059]": non_malaria_medication,
-            "Other diagnosis [EUPATH_0000317]": other_diagnosis,
-            "Other medical complaint [EUPATH_0020002]": other_medical_complaint,
-            "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present,
-            "Seizures [SYMP_0000124]": seizures,
-            "Seizures duration (days) [EUPATH_0000163]": seizures_duration,
-            "Severe malaria criteria [EUPATH_0000046]": severe_malaria_criteria,
-            "Subjective fever [EUPATH_0000100]": subjective_fever,
-            "Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]": submic_plas_present,
-            "Temperature (C) [EUPATH_0000110]": average_temperature,
-            "Visit date [EUPATH_0000091]": current_date,
-            "Visit type [EUPATH_0000311]": visit_type,
-            "Vomiting [HP_0002013]": vomiting,
-            "Vomiting duration (days) [EUPATH_0000165]": vomiting_duration,
-            "Weight (kg) [EUPATH_0000732]": weight,
-            "real": 999
-        }
+        imputed_row = [
+            imputed_obs_id, patient_id, household_id, abd_pain, abd_pain_duration,
+            admitting_hospital, round(current_age, 2), anorexia, anorexia_duration,
+            ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
+            cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
+            diarrhoea_duration, fatigue, fatigue_duration, febrile, febrile_duration, headache,
+            headache_duration, str(int(height)), average_haemoglobin, hospital_admission_date,
+            hospital_discharge_date, itn, jaundice, jaundice_duration, joint_pains,
+            joint_pains_duration, malaria_diagnosis, malaria_diagnosis_parasite,
+            malaria_treatment, muscle_aches, muscle_aches_duration, non_malaria_medication,
+            other_diagnosis, other_medical_complaint, plas_gam_present, seizures,
+            seizures_duration, severe_malaria_criteria, subjective_fever, submic_plas_present,
+            average_temperature, current_date, visit_type, vomiting, vomiting_duration,
+            weight, 999
+        ]
 
         # append imputed row to patient
-        imputed_patient = imputed_patient.append(imputed_row, ignore_index=True)
+        imputed_list.append(imputed_row)
         imputed_obs_id += 1
         current_age += 1/365
 
@@ -354,66 +344,25 @@ for patient_id in patients:
 
             current_weight = apply_linear_modelling(current_weight, daily_weight_change)
 
-            imputed_row = {
-                "Observation_Id": observation_id, 
-                "Participant_Id": patient_id,
-                "Household_Id": household_id,
-                "Abdominal pain [HP_0002027]": abd_pain,
-                "Abdominal pain duration (days) [EUPATH_0000154]": abd_pain_duration,
-                "Admitting hospital [EUPATH_0000318]": admitting_hospital,
-                "Age at visit (years) [EUPATH_0000113]": round(current_age, 2),
-                "Anorexia [SYMP_0000523]": anorexia,
-                "Anorexia duration (days) [EUPATH_0000155]": anorexia_duration,
-                "Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]": ax_plas_density,
-                "Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]": ax_plas_present,
-                "Basis of complicated diagnosis [EUPATH_0000316]": complex_diagnosis_basis,
-                "Complicated malaria [EUPATH_0000040]": complicated_malaria,
-                "Cough [SYMP_0000614]": cough,
-                "Cough duration (days) [EUPATH_0000156]": cough_duration,
-                "Days since enrollment [EUPATH_0000191]": str(days_since_enrollment),
-                "Diagnosis at hospitalization [EUPATH_0000638]": diagnosis_at_hospital,
-                "Diarrhea [DOID_13250]": diarrhoea,
-                "Diarrhea duration (days) [EUPATH_0000157]": diarrhoea_duration,
-                "Fatigue [SYMP_0019177]": fatigue,
-                "Fatigue duration (days) [EUPATH_0000158]": fatigue_duration,
-                "Febrile [EUPATH_0000097]": febrile,
-                "Fever, subjective duration (days) [EUPATH_0000164]": febrile_duration,
-                "Headache [HP_0002315]": headache,
-                "Headache duration (days) [EUPATH_0000159]": headache_duration,
-                "Height (cm) [EUPATH_0010075]": str(int(current_height)),
-                "Hemoglobin (g/dL) [EUPATH_0000047]": round(current_haemoglobin, 1),
-                "Hospital admission date [EUPATH_0000319]": hospital_admission_date,
-                "Hospital discharge date [EUPATH_0000320]": hospital_discharge_date,
-                "ITN last night [EUPATH_0000216]": itn,
-                "Jaundice [HP_0000952]": jaundice,
-                "Jaundice duration (days) [EUPATH_0000160]": jaundice_duration,
-                "Joint pains [SYMP_0000064]": joint_pains,
-                "Joint pains duration (days) [EUPATH_0000161]": joint_pains_duration,
-                "Malaria diagnosis [EUPATH_0000090]": malaria_diagnosis,
-                "Malaria diagnosis and parasite status [EUPATH_0000338]": malaria_diagnosis_parasite,
-                "Malaria treatment [EUPATH_0000740]": malaria_treatment,
-                "Muscle aches [EUPATH_0000252]": muscle_aches,
-                "Muscle aches duration (days) [EUPATH_0000162]": muscle_aches_duration,
-                "Non-malaria medication [EUPATH_0000059]": non_malaria_medication,
-                "Other diagnosis [EUPATH_0000317]": other_diagnosis,
-                "Other medical complaint [EUPATH_0020002]": other_medical_complaint,
-                "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present,
-                "Seizures [SYMP_0000124]": seizures,
-                "Seizures duration (days) [EUPATH_0000163]": seizures_duration,
-                "Severe malaria criteria [EUPATH_0000046]": severe_malaria_criteria,
-                "Subjective fever [EUPATH_0000100]": subjective_fever,
-                "Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]": submic_plas_present,
-                "Temperature (C) [EUPATH_0000110]": round(current_temperature, 1),
-                "Visit date [EUPATH_0000091]": current_date,
-                "Visit type [EUPATH_0000311]": visit_type,
-                "Vomiting [HP_0002013]": vomiting,
-                "Vomiting duration (days) [EUPATH_0000165]": vomiting_duration,
-                "Weight (kg) [EUPATH_0000732]": round(current_weight * 2) / 2,
-                "real": 999
-            }
+            imputed_row = [
+                imputed_obs_id, patient_id, household_id, abd_pain, abd_pain_duration,
+                admitting_hospital, round(current_age, 2), anorexia, anorexia_duration,
+                ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
+                cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
+                diarrhoea_duration, fatigue, fatigue_duration, febrile, febrile_duration,
+                headache, headache_duration, str(int(current_height)),
+                round(current_haemoglobin, 1), hospital_admission_date, hospital_discharge_date,
+                itn, jaundice, jaundice_duration, joint_pains, joint_pains_duration,
+                malaria_diagnosis, malaria_diagnosis_parasite, malaria_treatment, muscle_aches,
+                muscle_aches_duration, non_malaria_medication, other_diagnosis,
+                other_medical_complaint, plas_gam_present, seizures, seizures_duration,
+                severe_malaria_criteria, subjective_fever, submic_plas_present,
+                round(current_temperature, 1), current_date, visit_type, vomiting,
+                vomiting_duration, round(current_weight * 2) / 2, 999
+            ]
 
             # append imputed row to patient
-            imputed_patient = imputed_patient.append(imputed_row, ignore_index=True)
+            imputed_list.append(imputed_row)
             day_difference -= 1
             current_age += 1/365
 
@@ -445,82 +394,45 @@ for patient_id in patients:
 
     while current_date <= series_end_date:
 
-        imputed_row = {
-            "Observation_Id": observation_id, 
-            "Participant_Id": patient_id,
-            "Household_Id": household_id,
-            "Abdominal pain [HP_0002027]": abd_pain,
-            "Abdominal pain duration (days) [EUPATH_0000154]": abd_pain_duration,
-            "Admitting hospital [EUPATH_0000318]": admitting_hospital,
-            "Age at visit (years) [EUPATH_0000113]": round(current_age, 2),
-            "Anorexia [SYMP_0000523]": anorexia,
-            "Anorexia duration (days) [EUPATH_0000155]": anorexia_duration,
-            "Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092]": ax_plas_density,
-            "Asexual Plasmodium parasites present, by microscopy [EUPATH_0000048]": ax_plas_present,
-            "Basis of complicated diagnosis [EUPATH_0000316]": complex_diagnosis_basis,
-            "Complicated malaria [EUPATH_0000040]": complicated_malaria,
-            "Cough [SYMP_0000614]": cough,
-            "Cough duration (days) [EUPATH_0000156]": cough_duration,
-            "Days since enrollment [EUPATH_0000191]": days_since_enrollment,
-            "Diagnosis at hospitalization [EUPATH_0000638]": diagnosis_at_hospital,
-            "Diarrhea [DOID_13250]": diarrhoea,
-            "Diarrhea duration (days) [EUPATH_0000157]": diarrhoea_duration,
-            "Fatigue [SYMP_0019177]": fatigue,
-            "Fatigue duration (days) [EUPATH_0000158]": fatigue_duration,
-            "Febrile [EUPATH_0000097]": febrile,
-            "Fever, subjective duration (days) [EUPATH_0000164]": febrile_duration,
-            "Headache [HP_0002315]": headache,
-            "Headache duration (days) [EUPATH_0000159]": headache_duration,
-            "Height (cm) [EUPATH_0010075]": str(int(height)),
-            "Hemoglobin (g/dL) [EUPATH_0000047]": average_haemoglobin,
-            "Hospital admission date [EUPATH_0000319]": hospital_admission_date,
-            "Hospital discharge date [EUPATH_0000320]": hospital_discharge_date,
-            "ITN last night [EUPATH_0000216]": itn,
-            "Jaundice [HP_0000952]": jaundice,
-            "Jaundice duration (days) [EUPATH_0000160]": jaundice_duration,
-            "Joint pains [SYMP_0000064]": joint_pains,
-            "Joint pains duration (days) [EUPATH_0000161]": joint_pains_duration,
-            "Malaria diagnosis [EUPATH_0000090]": malaria_diagnosis,
-            "Malaria diagnosis and parasite status [EUPATH_0000338]": malaria_diagnosis_parasite,
-            "Malaria treatment [EUPATH_0000740]": malaria_treatment,
-            "Muscle aches [EUPATH_0000252]": muscle_aches,
-            "Muscle aches duration (days) [EUPATH_0000162]": muscle_aches_duration,
-            "Non-malaria medication [EUPATH_0000059]": non_malaria_medication,
-            "Other diagnosis [EUPATH_0000317]": other_diagnosis,
-            "Other medical complaint [EUPATH_0020002]": other_medical_complaint,
-            "Plasmodium gametocytes present, by microscopy [EUPATH_0000207]": plas_gam_present,
-            "Seizures [SYMP_0000124]": seizures,
-            "Seizures duration (days) [EUPATH_0000163]": seizures_duration,
-            "Severe malaria criteria [EUPATH_0000046]": severe_malaria_criteria,
-            "Subjective fever [EUPATH_0000100]": subjective_fever,
-            "Submicroscopic Plasmodium present, by LAMP [EUPATH_0000487]": submic_plas_present,
-            "Temperature (C) [EUPATH_0000110]": average_temperature,
-            "Visit date [EUPATH_0000091]": current_date,
-            "Visit type [EUPATH_0000311]": visit_type,
-            "Vomiting [HP_0002013]": vomiting,
-            "Vomiting duration (days) [EUPATH_0000165]": vomiting_duration,
-            "Weight (kg) [EUPATH_0000732]": average_weight,
-            "real": 999
-        }
+        imputed_row = [
+            imputed_obs_id, patient_id, household_id, abd_pain, abd_pain_duration,
+            admitting_hospital, round(current_age, 2), anorexia, anorexia_duration,
+            ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
+            cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
+            diarrhoea_duration, fatigue, fatigue_duration, febrile, febrile_duration, headache,
+            headache_duration, str(int(height)), average_haemoglobin, hospital_admission_date,
+            hospital_discharge_date, itn, jaundice, jaundice_duration, joint_pains,
+            joint_pains_duration, malaria_diagnosis, malaria_diagnosis_parasite,
+            malaria_treatment, muscle_aches, muscle_aches_duration, non_malaria_medication,
+            other_diagnosis, other_medical_complaint, plas_gam_present, seizures,
+            seizures_duration, severe_malaria_criteria, subjective_fever, submic_plas_present,
+            average_temperature, current_date, visit_type, vomiting, vomiting_duration,
+            average_weight, 999
+        ]
 
         # append imputed row to patient
-        imputed_patient = imputed_patient.append(imputed_row, ignore_index=True)
+        imputed_list.append(imputed_row)
         current_age += 1/365
         observation_id += 1
         current_date += delta
 
     break
 
-cols = list(imputed_patient.columns)
+imputed_rows = np.array(imputed_list)
+print(imputed_rows)
+imputed_data = pd.DataFrame(imputed_rows, columns)
+data.append(imputed_data, ignore_index=True)
+
+cols = list(data.columns)
 cols = [cols[-1]] + cols[:-1]
-imputed_patient = imputed_patient[cols]
+data = data[cols]
 
 # display results of first two rounds so far
-pd.set_option('display.max_rows', None)
-diagnosis = imputed_patient[["Observation_Id", height_string, visit_date_string, 'real']]
+#pd.set_option('display.max_rows', None)
+#diagnosis = imputed_patient[["Observation_Id", height_string, visit_date_string, 'real']]
 #print(diagnosis.sort_values([visit_date_string]))
 
 imputed_patient = imputed_patient.sort_values([visit_date_string])
-imputed_patient.to_csv('first_patient_imputed.tsv', sep='\t', index=False)
+imputed_patient.to_csv('new_imputed.tsv', sep='\t', index=False)
 
 print("--- %s seconds ---" % (time.time() - start_time))
