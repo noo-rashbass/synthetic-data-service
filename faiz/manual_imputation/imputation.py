@@ -18,7 +18,7 @@ weight_string = 'Weight (kg) [EUPATH_0000732]'
 
 data[visit_date_string] = pd.to_datetime(data[visit_date_string])
 
-data = data.assign(real=True)
+data = data.assign(real=1000)
 imputed_df = data[0:0]
 
 minmax_time = [min(data[visit_date_string]),\
@@ -64,7 +64,7 @@ def duration_calculator(duration, day_difference):
         status = "Yes"
         duration -= day_difference     # make int when writing
 
-    return status, duration
+    return status, str(duration)
 
 
 # checks whether column has same values for all rows, e.g. height
@@ -240,7 +240,7 @@ for patient_id in patients:
             "Vomiting [HP_0002013]": vomiting,
             "Vomiting duration (days) [EUPATH_0000165]": vomiting_duration,
             "Weight (kg) [EUPATH_0000732]": weight,
-            "real": False
+            "real": 999
         }
 
         # append imputed row to patient
@@ -281,7 +281,7 @@ for patient_id in patients:
 
             # reset values to current
             current_age = patient.iloc[real_visit][age_string]
-            current_height = patient.iloc[real_visit][age_string]
+            current_height = patient.iloc[real_visit][height_string]
             current_haemoglobin = patient.iloc[real_visit][haemoglobin_string]
             current_temperature = patient.iloc[real_visit][temperature_string]
             current_weight = patient.iloc[real_visit][weight_string]
@@ -370,7 +370,7 @@ for patient_id in patients:
                 "Complicated malaria [EUPATH_0000040]": complicated_malaria,
                 "Cough [SYMP_0000614]": cough,
                 "Cough duration (days) [EUPATH_0000156]": cough_duration,
-                "Days since enrollment [EUPATH_0000191]": days_since_enrollment,
+                "Days since enrollment [EUPATH_0000191]": str(days_since_enrollment),
                 "Diagnosis at hospitalization [EUPATH_0000638]": diagnosis_at_hospital,
                 "Diarrhea [DOID_13250]": diarrhoea,
                 "Diarrhea duration (days) [EUPATH_0000157]": diarrhoea_duration,
@@ -380,7 +380,7 @@ for patient_id in patients:
                 "Fever, subjective duration (days) [EUPATH_0000164]": febrile_duration,
                 "Headache [HP_0002315]": headache,
                 "Headache duration (days) [EUPATH_0000159]": headache_duration,
-                "Height (cm) [EUPATH_0010075]": current_height,
+                "Height (cm) [EUPATH_0010075]": str(int(current_height)),
                 "Hemoglobin (g/dL) [EUPATH_0000047]": round(current_haemoglobin, 1),
                 "Hospital admission date [EUPATH_0000319]": hospital_admission_date,
                 "Hospital discharge date [EUPATH_0000320]": hospital_discharge_date,
@@ -409,7 +409,7 @@ for patient_id in patients:
                 "Vomiting [HP_0002013]": vomiting,
                 "Vomiting duration (days) [EUPATH_0000165]": vomiting_duration,
                 "Weight (kg) [EUPATH_0000732]": round(current_weight * 2) / 2,
-                "real": False
+                "real": 999
             }
 
             # append imputed row to patient
@@ -471,7 +471,7 @@ for patient_id in patients:
             "Fever, subjective duration (days) [EUPATH_0000164]": febrile_duration,
             "Headache [HP_0002315]": headache,
             "Headache duration (days) [EUPATH_0000159]": headache_duration,
-            "Height (cm) [EUPATH_0010075]": height,
+            "Height (cm) [EUPATH_0010075]": str(int(height)),
             "Hemoglobin (g/dL) [EUPATH_0000047]": average_haemoglobin,
             "Hospital admission date [EUPATH_0000319]": hospital_admission_date,
             "Hospital discharge date [EUPATH_0000320]": hospital_discharge_date,
@@ -500,7 +500,7 @@ for patient_id in patients:
             "Vomiting [HP_0002013]": vomiting,
             "Vomiting duration (days) [EUPATH_0000165]": vomiting_duration,
             "Weight (kg) [EUPATH_0000732]": average_weight,
-            "real": False
+            "real": 999
         }
 
         # append imputed row to patient
@@ -511,12 +511,16 @@ for patient_id in patients:
 
     break
 
+cols = list(imputed_patient.columns)
+cols = [cols[-1]] + cols[:-1]
+imputed_patient = imputed_patient[cols]
+
 # display results of first two rounds so far
 pd.set_option('display.max_rows', None)
 diagnosis = imputed_patient[["Observation_Id", height_string, visit_date_string, 'real']]
 #print(diagnosis.sort_values([visit_date_string]))
 
 imputed_patient = imputed_patient.sort_values([visit_date_string])
-#imputed_patient.to_csv('first_patient_imputed.csv', index=False)
+imputed_patient.to_csv('first_patient_imputed.tsv', sep='\t', index=False)
 
 print("--- %s seconds ---" % (time.time() - start_time))
