@@ -64,24 +64,24 @@ minmax_time = [min(data[visit_date_string]),\
                max(data[visit_date_string])]
 
 # setting nan and constant values
-admitting_hospital = np.nan
-ax_plas_density = np.nan
-ax_plas_present = np.nan
-complex_diagnosis_basis = np.nan
-complicated_malaria = np.nan
-days_since_enrollment = np.nan
-diagnosis_at_hospital = np.nan
-hospital_admission_date = np.nan
-hospital_discharge_date = np.nan
-itn = np.nan
-malaria_diagnosis = np.nan
-non_malaria_medication = np.nan
-other_diagnosis = np.nan
-other_medical_complaint = np.nan
-plas_gam_present = np.nan
-severe_malaria_criteria = np.nan
-subjective_fever = np.nan
-submic_plas_present = np.nan
+admitting_hospital = str(np.nan)
+ax_plas_density = str(np.nan)
+ax_plas_present = str(np.nan)
+complex_diagnosis_basis = str(np.nan)
+complicated_malaria = str(np.nan)
+days_since_enrollment = str(np.nan)
+diagnosis_at_hospital = str(np.nan)
+hospital_admission_date = str(np.nan)
+hospital_discharge_date = str(np.nan)
+itn = str(np.nan)
+malaria_diagnosis = str(np.nan)
+non_malaria_medication = str(np.nan)
+other_diagnosis = str(np.nan)
+other_medical_complaint = str(np.nan)
+plas_gam_present = str(np.nan)
+severe_malaria_criteria = str(np.nan)
+subjective_fever = str(np.nan)
+submic_plas_present = str(np.nan)
 
 malaria_diagnosis_parasite = "Blood smear not indicated"
 malaria_treatment = "No malaria medications given"
@@ -98,7 +98,7 @@ def duration_calculator(duration, day_difference):
 
     if duration - day_difference < 0:
         status = "Unable to assess"
-        duration = 0
+        duration = np.nan
     else:
         status = "Yes"
         duration -= day_difference     # make int when writing
@@ -143,7 +143,6 @@ def apply_linear_modelling(variable, change):
 for patient_id in patients:
 
     print(patient_id)
-
     patient = data[data['Participant_Id'] == patient_id].\
                         sort_values([visit_date_string]).reset_index(drop=True)
 
@@ -177,7 +176,7 @@ for patient_id in patients:
 
     # set height as NAN for children and constant for adults
     # (may change for children in the future)
-    height = np.nan
+    height = str(np.nan)
     if same_height_throughout:
         height = str(int(first_row[height_string]))
 
@@ -223,7 +222,7 @@ for patient_id in patients:
         vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
 
         # weight NAN for children, averaging for adults
-        weight = np.nan
+        weight = str(np.nan)
         if current_age > 20:
             weight = average_weight
 
@@ -256,8 +255,11 @@ for patient_id in patients:
     # Round 2
     # imputation between visit dates
     visit_dates = patient[visit_date_string]
+    observation_id += 1
 
+    # if only one visit by patient then skip this round
     if len(visit_dates) > 1:
+
         current_date += delta
         real_visit = 1
         day_difference = (visit_dates.iloc[real_visit] - current_date).days
@@ -406,13 +408,13 @@ for patient_id in patients:
 
     abd_pain_duration = anorexia_duration = cough_duration = fatigue_duration =\
         febrile_duration = headache_duration = joints_pain_duration =\
-        muscle_aches_duration = seizures_duration = vomiting_duration = 0
+        muscle_aches_duration = seizures_duration = vomiting_duration = str(np.nan)
 
-    days_since_enrollment = np.nan
+    days_since_enrollment = str(np.nan)
 
     # set height as NAN for children and constant for adults 
     # (may change for children in the future)
-    height = np.nan
+    height = str(np.nan)
     if same_height_throughout:
         height = str(int(first_row[height_string]))
 
@@ -431,7 +433,7 @@ for patient_id in patients:
             other_diagnosis, other_medical_complaint, plas_gam_present, seizures,
             seizures_duration, severe_malaria_criteria, subjective_fever, submic_plas_present,
             average_temperature, current_date, visit_type, vomiting, vomiting_duration,
-            average_weight, 999
+            weight, 999
         ]
 
         # append imputed row to patient
@@ -440,6 +442,7 @@ for patient_id in patients:
         observation_id += 1
         current_date += delta
 
+    break
 
 imputed_rows = np.array(imputed_list)
 imputed_data = pd.DataFrame(imputed_rows, columns=cols)
