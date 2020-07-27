@@ -1,3 +1,11 @@
+'''
+This file carries out imputation on the dataset. It consists of 3 rounds of imputation:
+
+Round 1: Data is imputed from the series start date to the patient's first visit
+Round 2: Data is imputed for missing visits between the patient's first and last visit
+Round 3: Data is imputed from the patient's last visit to the series end date
+'''
+
 import pandas as pd
 import numpy as np
 import time
@@ -131,9 +139,10 @@ def apply_linear_modelling(variable, change):
 
     return variable
 
-
 # imputing for each patient
 for patient_id in patients:
+
+    print(patient_id)
 
     patient = data[data['Participant_Id'] == patient_id].\
                         sort_values([visit_date_string]).reset_index(drop=True)
@@ -170,7 +179,7 @@ for patient_id in patients:
     # (may change for children in the future)
     height = np.nan
     if same_height_throughout:
-        height = first_row[height_string]
+        height = str(int(first_row[height_string]))
 
     # imputing from series start date to patient start date
     while current_date < patient_start_date:
@@ -224,7 +233,7 @@ for patient_id in patients:
             ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
             cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
             diarrhoea_duration, fatigue, fatigue_duration, febrile, febrile_duration, headache,
-            headache_duration, str(int(height)), average_haemoglobin, hospital_admission_date,
+            headache_duration, height, average_haemoglobin, hospital_admission_date,
             hospital_discharge_date, itn, jaundice, jaundice_duration, joint_pains,
             joint_pains_duration, malaria_diagnosis, malaria_diagnosis_parasite,
             malaria_treatment, muscle_aches, muscle_aches_duration, non_malaria_medication,
@@ -247,138 +256,141 @@ for patient_id in patients:
     # Round 2
     # imputation between visit dates
     visit_dates = patient[visit_date_string]
-    current_date += delta
-    real_visit = 1
-    day_difference = (visit_dates.iloc[real_visit] - current_date).days
 
-    current_age = first_row[age_string] + 1/365 
-    current_height = first_row[height_string]
-    current_haemoglobin = first_row[haemoglobin_string]
-    current_temperature = first_row[temperature_string]
-    current_weight = first_row[weight_string]
-
-    daily_height_increase = get_linear_modelling_value(patient, 1, day_difference, height_string)
-    daily_haemoglobin_change =\
-        get_linear_modelling_value(patient, 1, day_difference, haemoglobin_string)
-    daily_temperature_change =\
-        get_linear_modelling_value(patient, 1, day_difference, temperature_string)
-    daily_weight_change = get_linear_modelling_value(patient, 1, day_difference, weight_string)
-
-    # go through each date from first visit to last visit and check if real visit exists on this date
-    # if not, impute one
-    while current_date < patient_end_date:
-
-        if current_date == visit_dates.iloc[real_visit]:
-
-            # reset values to current
-            current_age = patient.iloc[real_visit][age_string]
-            current_height = patient.iloc[real_visit][height_string]
-            current_haemoglobin = patient.iloc[real_visit][haemoglobin_string]
-            current_temperature = patient.iloc[real_visit][temperature_string]
-            current_weight = patient.iloc[real_visit][weight_string]
-
-            # increment time tracker variables
-            real_visit += 1
-            day_difference = (visit_dates.iloc[real_visit] - current_date).days
-
-            # check if same values between these visits & linearly model values between visits
-            daily_height_increase =\
-                get_linear_modelling_value(patient, real_visit, day_difference, height_string)
-            daily_haemoglobin_change =\
-                get_linear_modelling_value(patient, real_visit, day_difference, haemoglobin_string)
-            daily_temperature_change =\
-                get_linear_modelling_value(patient, real_visit, day_difference, temperature_string)
-            daily_weight_change =\
-                get_linear_modelling_value(patient, real_visit, day_difference, weight_string)
-
-        else:
-
-            # do imputation for this date
-            abd_pain_duration =\
-                patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
-            abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
-
-            anorexia_duration =\
-                patient.iloc[real_visit]['Anorexia duration (days) [EUPATH_0000155]']
-            anorexia, anorexia_duration = duration_calculator(anorexia_duration, day_difference)
-
-            cough_duration = patient.iloc[real_visit]['Cough duration (days) [EUPATH_0000156]']
-            cough, cough_duration = duration_calculator(cough_duration, day_difference)
-
-            days_since_enrollment = (current_date - patient_start_date).days
-
-            diarrhoea_duration =\
-                patient.iloc[real_visit]['Diarrhea duration (days) [EUPATH_0000157]']
-            diarrhoea, diarrhoea_duration =\
-                duration_calculator(diarrhoea_duration, day_difference)
-
-            fatigue_duration =\
-                patient.iloc[real_visit]['Fatigue duration (days) [EUPATH_0000158]']
-            fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
-
-            febrile_duration =\
-                patient.iloc[real_visit]['Fever, subjective duration (days) [EUPATH_0000164]']
-            febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
-
-            headache_duration =\
-                patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
-            headache, headache_duration = duration_calculator(headache_duration, day_difference)
-
-            current_height = apply_linear_modelling(current_height, daily_height_increase)
-            current_haemoglobin =\
-                apply_linear_modelling(current_haemoglobin, daily_haemoglobin_change)
-
-            jaundice_duration =\
-                patient.iloc[real_visit]['Jaundice duration (days) [EUPATH_0000160]']
-            jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
-
-            joint_pains_duration =\
-                patient.iloc[real_visit]['Joint pains duration (days) [EUPATH_0000161]']
-            joint_pains, joint_pains_duration =\
-                duration_calculator(joint_pains_duration, day_difference)
-
-            muscle_aches_duration =\
-                patient.iloc[real_visit]['Muscle aches duration (days) [EUPATH_0000162]']
-            muscle_aches, muscle_aches_duration =\
-                duration_calculator(muscle_aches_duration, day_difference)
-
-            seizures_duration =\
-                patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
-            seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
-
-            current_temperature =\
-                apply_linear_modelling(current_temperature, daily_temperature_change)
-
-            vomiting_duration =\
-                patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
-            vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
-
-            current_weight = apply_linear_modelling(current_weight, daily_weight_change)
-
-            imputed_row = [
-                observation_id, patient_id, household_id, abd_pain, abd_pain_duration,
-                admitting_hospital, round(current_age, 2), anorexia, anorexia_duration,
-                ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
-                cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
-                diarrhoea_duration, fatigue, fatigue_duration, febrile, febrile_duration,
-                headache, headache_duration, str(int(current_height)),
-                round(current_haemoglobin, 1), hospital_admission_date, hospital_discharge_date,
-                itn, jaundice, jaundice_duration, joint_pains, joint_pains_duration,
-                malaria_diagnosis, malaria_diagnosis_parasite, malaria_treatment, muscle_aches,
-                muscle_aches_duration, non_malaria_medication, other_diagnosis,
-                other_medical_complaint, plas_gam_present, seizures, seizures_duration,
-                severe_malaria_criteria, subjective_fever, submic_plas_present,
-                round(current_temperature, 1), current_date, visit_type, vomiting,
-                vomiting_duration, round(current_weight * 2) / 2, 999
-            ]
-
-            # append imputed row to patient
-            imputed_list.append(imputed_row)
-            day_difference -= 1
-            current_age += 1/365
-
-        observation_id += 1
+    if len(visit_dates) > 1:
         current_date += delta
+        real_visit = 1
+        day_difference = (visit_dates.iloc[real_visit] - current_date).days
+
+        current_age = first_row[age_string] + 1/365 
+        current_height = first_row[height_string]
+        current_haemoglobin = first_row[haemoglobin_string]
+        current_temperature = first_row[temperature_string]
+        current_weight = first_row[weight_string]
+
+        daily_height_increase = get_linear_modelling_value(patient, 1, day_difference, height_string)
+        daily_haemoglobin_change =\
+            get_linear_modelling_value(patient, 1, day_difference, haemoglobin_string)
+        daily_temperature_change =\
+            get_linear_modelling_value(patient, 1, day_difference, temperature_string)
+        daily_weight_change = get_linear_modelling_value(patient, 1, day_difference, weight_string)
+
+        # go through each date from first visit to last visit
+        # check if real visit exists on this date
+        # if not, impute one
+        while current_date < patient_end_date:
+
+            if current_date == visit_dates.iloc[real_visit]:
+
+                # reset values to current
+                current_age = patient.iloc[real_visit][age_string]
+                current_height = patient.iloc[real_visit][height_string]
+                current_haemoglobin = patient.iloc[real_visit][haemoglobin_string]
+                current_temperature = patient.iloc[real_visit][temperature_string]
+                current_weight = patient.iloc[real_visit][weight_string]
+
+                # increment time tracker variables
+                real_visit += 1
+                day_difference = (visit_dates.iloc[real_visit] - current_date).days
+
+                # check if same values between these visits & linearly model values between visits
+                daily_height_increase =\
+                    get_linear_modelling_value(patient, real_visit, day_difference, height_string)
+                daily_haemoglobin_change =\
+                    get_linear_modelling_value(patient, real_visit, day_difference, haemoglobin_string)
+                daily_temperature_change =\
+                    get_linear_modelling_value(patient, real_visit, day_difference, temperature_string)
+                daily_weight_change =\
+                    get_linear_modelling_value(patient, real_visit, day_difference, weight_string)
+
+            else:
+
+                # do imputation for this date
+                abd_pain_duration =\
+                    patient.iloc[real_visit]['Abdominal pain duration (days) [EUPATH_0000154]']
+                abd_pain, abd_pain_duration = duration_calculator(abd_pain_duration, day_difference)
+
+                anorexia_duration =\
+                    patient.iloc[real_visit]['Anorexia duration (days) [EUPATH_0000155]']
+                anorexia, anorexia_duration = duration_calculator(anorexia_duration, day_difference)
+
+                cough_duration = patient.iloc[real_visit]['Cough duration (days) [EUPATH_0000156]']
+                cough, cough_duration = duration_calculator(cough_duration, day_difference)
+
+                days_since_enrollment = (current_date - patient_start_date).days
+
+                diarrhoea_duration =\
+                    patient.iloc[real_visit]['Diarrhea duration (days) [EUPATH_0000157]']
+                diarrhoea, diarrhoea_duration =\
+                    duration_calculator(diarrhoea_duration, day_difference)
+
+                fatigue_duration =\
+                    patient.iloc[real_visit]['Fatigue duration (days) [EUPATH_0000158]']
+                fatigue, fatigue_duration = duration_calculator(fatigue_duration, day_difference)
+
+                febrile_duration =\
+                    patient.iloc[real_visit]['Fever, subjective duration (days) [EUPATH_0000164]']
+                febrile, febrile_duration = duration_calculator(febrile_duration, day_difference)
+
+                headache_duration =\
+                    patient.iloc[real_visit]['Headache duration (days) [EUPATH_0000159]']
+                headache, headache_duration = duration_calculator(headache_duration, day_difference)
+
+                current_height = apply_linear_modelling(current_height, daily_height_increase)
+                current_haemoglobin =\
+                    apply_linear_modelling(current_haemoglobin, daily_haemoglobin_change)
+
+                jaundice_duration =\
+                    patient.iloc[real_visit]['Jaundice duration (days) [EUPATH_0000160]']
+                jaundice, jaundice_duration = duration_calculator(jaundice_duration, day_difference)
+
+                joint_pains_duration =\
+                    patient.iloc[real_visit]['Joint pains duration (days) [EUPATH_0000161]']
+                joint_pains, joint_pains_duration =\
+                    duration_calculator(joint_pains_duration, day_difference)
+
+                muscle_aches_duration =\
+                    patient.iloc[real_visit]['Muscle aches duration (days) [EUPATH_0000162]']
+                muscle_aches, muscle_aches_duration =\
+                    duration_calculator(muscle_aches_duration, day_difference)
+
+                seizures_duration =\
+                    patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
+                seizures, seizures_duration = duration_calculator(seizures_duration, day_difference)
+
+                current_temperature =\
+                    apply_linear_modelling(current_temperature, daily_temperature_change)
+
+                vomiting_duration =\
+                    patient.iloc[real_visit]['Seizures duration (days) [EUPATH_0000163]']
+                vomiting, vomiting_duration = duration_calculator(vomiting_duration, day_difference)
+
+                current_weight = apply_linear_modelling(current_weight, daily_weight_change)
+
+                imputed_row = [
+                    observation_id, patient_id, household_id, abd_pain, abd_pain_duration,
+                    admitting_hospital, round(current_age, 2), anorexia, anorexia_duration,
+                    ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
+                    cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
+                    diarrhoea_duration, fatigue, fatigue_duration, febrile, febrile_duration,
+                    headache, headache_duration, str(int(current_height)),
+                    round(current_haemoglobin, 1), hospital_admission_date, hospital_discharge_date,
+                    itn, jaundice, jaundice_duration, joint_pains, joint_pains_duration,
+                    malaria_diagnosis, malaria_diagnosis_parasite, malaria_treatment, muscle_aches,
+                    muscle_aches_duration, non_malaria_medication, other_diagnosis,
+                    other_medical_complaint, plas_gam_present, seizures, seizures_duration,
+                    severe_malaria_criteria, subjective_fever, submic_plas_present,
+                    round(current_temperature, 1), current_date, visit_type, vomiting,
+                    vomiting_duration, round(current_weight * 2) / 2, 999
+                ]
+
+                # append imputed row to patient
+                imputed_list.append(imputed_row)
+                day_difference -= 1
+                current_age += 1/365
+
+            observation_id += 1
+            current_date += delta
 
 # ================================================================================
 
@@ -402,7 +414,7 @@ for patient_id in patients:
     # (may change for children in the future)
     height = np.nan
     if same_height_throughout:
-        height = first_row[height_string]
+        height = str(int(first_row[height_string]))
 
     while current_date <= series_end_date:
 
@@ -412,7 +424,7 @@ for patient_id in patients:
             ax_plas_density, ax_plas_present, complex_diagnosis_basis, complicated_malaria,
             cough, cough_duration, days_since_enrollment, diagnosis_at_hospital, diarrhoea,
             diarrhoea_duration, fatigue, fatigue_duration, febrile, febrile_duration, headache,
-            headache_duration, str(int(height)), average_haemoglobin, hospital_admission_date,
+            headache_duration, height, average_haemoglobin, hospital_admission_date,
             hospital_discharge_date, itn, jaundice, jaundice_duration, joint_pains,
             joint_pains_duration, malaria_diagnosis, malaria_diagnosis_parasite,
             malaria_treatment, muscle_aches, muscle_aches_duration, non_malaria_medication,
@@ -441,4 +453,4 @@ data = data[c]
 data = data.sort_values(['Observation_Id'])
 data.to_csv('refactored.tsv', sep='\t', index=False)
 
-#print("--- %s seconds ---" % (time.time() - start_time))
+print("--- %s seconds ---" % (time.time() - start_time))

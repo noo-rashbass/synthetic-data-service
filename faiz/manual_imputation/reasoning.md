@@ -1,18 +1,29 @@
-participant ID and household ID stay the same
-abdominal pain - 'unable to assess', or yes if from future visit
-abdominal pain duration - 0 if unable to assess, compute from future visit duration otherwise
-admitting hospital - NA
-age imputation in file
-anorexia - 'unable to assess', or yes if from future visit
-anorexia duration - 0 if unable to assess, compute from future visit duration otherwise
-asex plasmod density - NA
-asex plasmod present - NA if density NA, positive if density > 0
-basis of complicated diagnosis - NA
-complicated malaria - NA
-cough - 'unable to assess', or yes if from future visit
-cough duration - 0 if unable to assess, compute from future visit duration otherwise
-days since enrollment - NA outside range, calculate otherwise
-Diagnosis at hospitalization - NA
+# Constants (not dependent on imputation round)
+
+Observation ID increments by 1 every day
+Participant ID and Household ID stay the same
+Admitting hospital - NA (patient not actually admitted)
+Age increments by 1/365 every day
+Asexual plasmodium density - NA*
+Asexual plasmodium present - NA*
+Basis of complicated diagnosis - NA*
+Complicated malaria - NA*
+Diagnosis at hospitalization - NA (not actually hospitalised)
+
+# Round 1
+
+Abdominal pain - `Unable to assess` or `Yes` if calculated from future visit
+Abdominal pain duration - 0 if `Unable to assess`, or compute from future visit duration otherwise
+
+Anorexia - `Unable to assess` or `Yes` if calculated from future visit
+Anorexia duration - 0 if `Unable to assess`, or compute from future visit duration otherwise
+
+Cough - `Unable to assess` or `Yes` if calculated from future visit
+Cough duration - 0 if `Unable to assess`, or compute from future visit duration otherwise
+
+Days since enrollment - NA (outside range)
+
+
 diarrhoea - 'unable to assess', or yes if from future visit
 diarrhoea duration - 0 if unable to assess, compute from future visit otherwise
 fatigue - 'unable to assess', or yes if from future visit
@@ -71,3 +82,5 @@ Malaria diagnosis and parasite status - 'Blood smear not indicated'
                                         nan
 subjective fever - no, yes, NA
 weight - linearly interpolate between values, but what before and after?
+
+* we can't accurately guess without testing 
