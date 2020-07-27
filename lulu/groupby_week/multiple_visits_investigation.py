@@ -27,7 +27,7 @@ df_2 = df[df['counts']==2].drop(columns=['counts'])
 # print(df_2.head(20))
 
 ## Get df for instances of 3 per week
-# df_3 = df[df['counts']==3].drop(columns=['counts'])
+df_3 = df[df['counts']==3].drop(columns=['counts'])
 # print(df_3)
 
 ########################################################################################################
@@ -39,15 +39,15 @@ df_2 = df[df['counts']==2].drop(columns=['counts'])
 # plt.hist(df_3['Visit week'].unique())
 # plt.show()
 
-df_2_week_series = df_2['Visit week'].value_counts().sort_index() # beware over-counting, divide counts by two before viewing!
-df_2_weeks = df_2_week_series.index.tolist()
-df_2_weeks_freq = [x/2 for x in df_2_week_series.values.tolist()] # corrects over-counting :)
-plt.plot(df_2_weeks, df_2_weeks_freq)
-plt.show()
+# df_2_week_series = df_2['Visit week'].value_counts().sort_index() # beware over-counting, divide counts by two before viewing!
+# df_2_weeks = df_2_week_series.index.tolist()
+# df_2_weeks_freq = [x/2 for x in df_2_week_series.values.tolist()] # corrects over-counting :)
+# plt.plot(df_2_weeks, df_2_weeks_freq)
+# plt.show()
 
-df_2_week_list = df_2['Visit week'] # just the non-unique monday dates of all instances of 2 visits in that week (over-counted)
-# sns.kdeplot(df_2_week_list) ## DOES NOT WORK. CONVERT VISIT WEEK TO NUMBER OF WEEKS INTO THE STUDY
-plt.show()
+# df_2_week_list = df_2['Visit week'] # just the non-unique monday dates of all instances of 2 visits in that week (over-counted)
+# # sns.kdeplot(df_2_week_list) ## DOES NOT WORK. CONVERT VISIT WEEK TO NUMBER OF WEEKS INTO THE STUDY
+# plt.show()
 
 
 ## For individuals, do instances of 2 and 3 visits happen consecutively? (e.g. 5 visits in 2 weeks due to complications)
