@@ -442,7 +442,6 @@ for patient_id in patients:
         observation_id += 1
         current_date += delta
 
-    break
 
 imputed_rows = np.array(imputed_list)
 imputed_data = pd.DataFrame(imputed_rows, columns=cols)
@@ -456,4 +455,4 @@ data = data[c]
 data = data.sort_values(['Observation_Id'])
 data.to_csv('refactored.tsv', sep='\t', index=False)
 
-print("--- %s seconds ---" % (time.time() - start_time))
+print("--- The program took %s seconds to run ---" % (time.time() - start_time))
