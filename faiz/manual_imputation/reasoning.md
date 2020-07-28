@@ -1,3 +1,13 @@
+# Imputation
+
+Imputation was carried out on the PRISM dataset in order to have a full timeseries with no gaps to pass as an input to the GAN. This file contains the imputation methods for each column at each round of imputation. There are 3 rounds in total of imputation, described further below.
+
+# Rounds
+
+Round 1: Data is imputed from the series start date to the patient's first visit\
+Round 2: Data is imputed for missing visits between the patient's first and last visit\
+Round 3: Data is imputed from the patient's last visit to the series end date
+
 # Constants (not dependent on imputation round)
 
 Observation ID increments by 1 every day\
