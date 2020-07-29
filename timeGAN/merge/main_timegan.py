@@ -59,7 +59,7 @@ def main (args):
         
     generated_data = timegan(ori_data, ori_data_static, parameters)   
     print('Finish Synthetic Data Generation')
-    np.save('gen_mix_data_2', generated_data)
+    np.save('gen_mix_data', generated_data)
     
     """
     ## Performance metrics   
@@ -125,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--iteration',
         help='Training iterations (should be optimized)',
-        default=10000,
+        default=1,
         type=int)
     parser.add_argument(
         '--batch_size',
