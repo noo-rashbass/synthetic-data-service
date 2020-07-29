@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore")
 # 1. TimeGAN model
 from timegan import timegan
 # 2. Data loading
-from data_loading import real_data_loading, sine_data_generation
+from data_loading import real_data_loading, sine_data_generation, sine_data_generation_static
 # 3. Metrics
 #from metrics.discriminative_metrics import discriminative_score_metrics
 #from metrics.predictive_metrics import predictive_score_metrics
@@ -44,6 +44,7 @@ def main (args):
         # Set number of samples and its dimensions
         no, dim = 10000, 5
         ori_data = sine_data_generation(no, args.seq_len, dim)
+        ori_data_static = sine_data_generation_static(no, args.seq_len, 2)
         
     print(args.data_name + ' dataset is ready.')
         
@@ -56,8 +57,9 @@ def main (args):
     parameters['iterations'] = args.iteration
     parameters['batch_size'] = args.batch_size
         
-    generated_data = timegan(ori_data, parameters)   
+    generated_data = timegan(ori_data, ori_data_static, parameters)   
     print('Finish Synthetic Data Generation')
+    np.save('gen_mix_data_2', generated_data)
     
     """
     ## Performance metrics   
@@ -98,7 +100,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--data_name',
         choices=['sine','stock','energy'],
-        default='stock',
+        default='sine',
         type=str)
     parser.add_argument(
         '--seq_len',
@@ -123,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--iteration',
         help='Training iterations (should be optimized)',
-        default=50000,
+        default=10000,
         type=int)
     parser.add_argument(
         '--batch_size',

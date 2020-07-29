@@ -75,6 +75,32 @@ def sine_data_generation (no, seq_len, dim):
     data.append(temp)
                 
   return data
+
+  
+
+def sine_data_generation_static(no, seq_len, dim):
+  # Initialize the output
+  data = list()
+  for i in range(no):      
+    # Initialize each time-series
+    temp = list()
+    # For each feature
+    for k in range(dim):
+      x = np.random.normal(0.5, 0.25, 1)            
+      # Generate sine signal based on the drawn frequency and phase
+      temp_data = [x for _ in range(seq_len)] 
+      temp.append(temp_data)
+        
+    # Align row/column
+    temp = np.transpose(np.asarray(temp))
+          
+    # Normalize to [0,1]
+    temp = (temp + 1)*0.5
+    # Stack the generated data
+    data.append(temp)
+                
+  return data  
+  
     
 
 def real_data_loading (data_name, seq_len):
@@ -113,3 +139,4 @@ def real_data_loading (data_name, seq_len):
     data.append(temp_data[idx[i]])
     
   return data
+
