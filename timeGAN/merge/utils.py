@@ -104,7 +104,7 @@ def random_generator (batch_size, z_dim, T_mb, max_seq_len):
   return np.array(Z_mb)
 
 
-def batch_generator(data, time, batch_size):
+def batch_generator(data, data_static, time, batch_size):
   """Mini-batch generator.
   
   Args:
@@ -123,5 +123,5 @@ def batch_generator(data, time, batch_size):
             
   X_mb = np.array([data[i] for i in train_idx])
   T_mb = np.array([time[i] for i in train_idx])
-  
-  return X_mb, T_mb
+  X_mb_static = np.array([data_static[i] for i in train_idx])
+  return X_mb, X_mb_static, T_mb

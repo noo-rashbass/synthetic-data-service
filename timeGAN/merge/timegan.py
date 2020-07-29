@@ -184,15 +184,15 @@ def timegan(ori_data, ori_data_static, parameters):
        
        
         
-        generator_model = tf.keras.Sequential(name="generator_static", layers= [
+        generator_model_static = tf.keras.Sequential(name="generator_static", layers= [
             
             tf.keras.layers.Dense(hidden_dim, input_shape=(seq_len, dim)),
-            tf.keras.layers.Dense(),
-            tf.keras.layers.Dense(),
+            tf.keras.layers.Dense(hidden_dim),
+            tf.keras.layers.Dense(hidden_dim),
             tf.keras.layers.Dense(hidden_dim, activation='sigmoid'),
         ])
 
-        return make_generator_static
+        return generator_model_static
 
     def make_supervisor (): 
         """Generate next sequence using the previous sequence.
@@ -206,7 +206,7 @@ def timegan(ori_data, ori_data_static, parameters):
         """     
         supervisor_model = tf.keras.Sequential(name='supervisor')
         for i in range(num_layers-1):
-            supervisor_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
+            supervisor_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim*2)))
         supervisor_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
 ##        e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers-1)])
@@ -249,15 +249,15 @@ def timegan(ori_data, ori_data_static, parameters):
     def make_discriminator_static ():  
        
         
-        discriminator_model = tf.keras.Sequential(name="discriminator_static", layers= [
+        discriminator_model_static = tf.keras.Sequential(name="discriminator_static", layers= [
             
             tf.keras.layers.Dense(hidden_dim, input_shape=(seq_len, hidden_dim)),
-            tf.keras.layers.Dense(),
-            tf.keras.layers.Dense(),
+            tf.keras.layers.Dense(hidden_dim),
+            tf.keras.layers.Dense(hidden_dim),
             tf.keras.layers.Dense(1, activation=None),
         ])
 
-        return make_discriminator_static
+        return discriminator_model_static
     
 
 
@@ -269,6 +269,9 @@ def timegan(ori_data, ori_data_static, parameters):
 
     embedder_model_static = make_embedder_static()
     recovery_model_static = make_recovery_static()
+    generator_model_static = make_generator_static()
+    discriminator_model_static = make_discriminator_static()
+
 
     def get_embedder_T0_loss(X, X_tilde):
         mse = tf.keras.losses.MeanSquaredError() 
@@ -343,6 +346,7 @@ def timegan(ori_data, ori_data_static, parameters):
     gen_s_optimizer = tf.keras.optimizers.Adam()
     generator_optimizer = tf.keras.optimizers.Adam()
     discriminator_optimizer = tf.keras.optimizers.Adam()
+    
     embedder0_static_optimizer = tf.keras.optimizers.Adam()
     embedder_static_optimizer = tf.keras.optimizers.Adam()
 
@@ -381,18 +385,22 @@ def timegan(ori_data, ori_data_static, parameters):
     
 
     @tf.function
-    def train_step_generator_s(X_mb):
+    def train_step_generator_s(X_mb, X_mb_static):
         
         with tf.GradientTape() as gen_s_tape: #, tf.GradientTape() as s_tape:
             
             H_mb = embedder_model(X_mb) #recall
+            H_mb_static = embedder_model_static(X_mb_static)
             
+            #Embeddings of both static and temporal features
+            H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
+
             # Generator
-            H_hat_supervise_mb = supervisor_model(H_mb)
+            H_hat_supervise_mb = supervisor_model(H_mb_mix)
 
             gen_s_loss = get_generator_s_loss(H_mb, H_hat_supervise_mb) #hot sure if i should do whole gen loss or only gen_s loss
             gen_s_vars = supervisor_model.trainable_variables #removed possibly useless generator variables.
-            #vars = [generator_model.trainable_variables, supervisor_model.trainable_variables]
+            #vars = [generator_model.trainable_vaiables, supervisor_model.trainable_variables]
             gradients_of_gen_s = gen_s_tape.gradient(gen_s_loss, gen_s_vars)
             gen_s_optimizer.apply_gradients(zip(gradients_of_gen_s, gen_s_vars))
 
@@ -478,11 +486,11 @@ def timegan(ori_data, ori_data_static, parameters):
         #1. Embedding static network training
         print('Start Embedding Network Training')
 
-        for itt in range(iterations):
+        for itt in range(1):
             # Set mini-batch
-            X_mb, T_mb = batch_generator(ori_data_static, ori_time, batch_size) 
+            _, X_mb_static, _ = batch_generator(ori_data, ori_data_static, ori_time, batch_size) 
             # Train embedder
-            step_e_loss = train_step_embedder_static(X_mb)
+            step_e_loss = train_step_embedder_static(X_mb_static)
            
             # Checkpoint
             if itt % 1000 == 0:
@@ -491,20 +499,18 @@ def timegan(ori_data, ori_data_static, parameters):
         print('Finish static Embedding Network Training')
 
         #1. Embedding network training
-        H_mb = embedder_model_static(X_mb)
-        X_tilde_mb = recovery_model_static(H_mb)
         
-        for itt in range(iterations):
+        
+        for itt in range(1):
             # Set mini-batch
-            X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size) 
+            X_mb, _, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)
             # Train embedder
             step_e_loss = train_step_embedder(X_mb)
            
             # Checkpoint
             if itt % 1000 == 0:
                 print('step: '+ str(itt) + '/' + str(iterations) + ', e_loss: ' + str(np.round(np.sqrt(step_e_loss),4)) )
-        H_mb = embedder_model(X_mb)
-        X_tilde_mb = recovery_model(H_mb)
+        
 
         
         #@. Training only with supervised loss
@@ -512,10 +518,10 @@ def timegan(ori_data, ori_data_static, parameters):
 
         for itt in range(iterations):
             # Set mini-batch
-            X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)
+            X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)
             
             # Train generator
-            step_gen_s_loss = train_step_generator_s(X_mb)
+            step_gen_s_loss = train_step_generator_s(X_mb, X_mb_static)
 
             # Checkpoint
             if itt % 1000 == 0:
@@ -576,32 +582,5 @@ def timegan(ori_data, ori_data_static, parameters):
     return train()
 
 
-####TESTING####
 
-# from data_loading import real_data_loading, sine_data_generation
-
-# data_name = 'stock'
-# seq_len = 9
-
-# if data_name in ['stock', 'energy']:
-#  ori_data = real_data_loading(data_name, seq_len)
-# elif data_name == 'sine':
-#   # Set number of samples and its dimensions
-#   no, dim = 15, 5
-#   ori_data = sine_data_generation(no, seq_len, dim)
-    
-# print(data_name + ' dataset is ready.')
-
-# ## Newtork parameters
-# parameters = dict()
-
-# parameters['module'] = 'lstm' 
-# parameters['hidden_dim'] = 4
-# parameters['num_layer'] = 3
-# parameters['iterations'] = 10
-# parameters['batch_size'] = 7
-
-# generated_data = timegan(ori_data, parameters)
-# print('Finish Synthetic Data Generation')
-# #print(generated_data)
 
