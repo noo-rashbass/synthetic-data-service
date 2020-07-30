@@ -5,13 +5,14 @@ from __future__ import print_function
 
 import argparse
 import numpy as np
+import sys
 import warnings
 warnings.filterwarnings("ignore")
 
 # 1. TimeGAN model
 from timegan import timegan
 # 2. Data loading
-from data_loading import real_data_loading, sine_data_generation, sine_data_generation_static
+from data_loading import real_data_loading, sine_data_generation, sine_data_generation_static, sine_data_generation_mix
 # 3. Metrics
 #from metrics.discriminative_metrics import discriminative_score_metrics
 #from metrics.predictive_metrics import predictive_score_metrics
@@ -44,9 +45,11 @@ def main (args):
         # Set number of samples and its dimensions
         no, dim = 10000, 5
         ori_data = sine_data_generation(no, args.seq_len, dim)
-        ori_data_static = sine_data_generation_static(no, args.seq_len, 2)
-        
-    print(args.data_name + ' dataset is ready.')
+        #ori_data_static = sine_data_generation_static(no, args.seq_len, 1)
+    elif args.data_name == 'normal':
+        no, dim = 10000, 2
+        ori_data, ori_data_static = sine_data_generation_mix(no, args.seq_len, dim)
+    
         
     ## Synthetic data generation by TimeGAN
     # Set newtork parameters
@@ -59,7 +62,7 @@ def main (args):
         
     generated_data = timegan(ori_data, ori_data_static, parameters)   
     print('Finish Synthetic Data Generation')
-    np.save('gen_mix_data', generated_data)
+    np.save('gen_mix_data_2_dimension', generated_data)
     
     """
     ## Performance metrics   
@@ -100,7 +103,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--data_name',
         choices=['sine','stock','energy'],
-        default='sine',
+        default='normal',
         type=str)
     parser.add_argument(
         '--seq_len',
@@ -115,17 +118,17 @@ if __name__ == '__main__':
     parser.add_argument(
         '--hidden_dim',
         help='hidden state dimensions (should be optimized)',
-        default=24,
+        default=10,
         type=int)
     parser.add_argument(
         '--num_layer',
         help='number of layers (should be optimized)',
-        default=3,
+        default=5,
         type=int)
     parser.add_argument(
         '--iteration',
         help='Training iterations (should be optimized)',
-        default=1,
+        default=5000,
         type=int)
     parser.add_argument(
         '--batch_size',

@@ -1,4 +1,6 @@
-import tensorflow as tf 
+import tensorflow as tf
+physical_devices = tf.config.list_physical_devices('GPU') 
+tf.config.experimental.set_memory_growth(physical_devices[0], True) 
 print(tf.__version__)
 import numpy as np
 #uncomment line below if not using StackedRNN
@@ -19,14 +21,14 @@ def timegan(ori_data, ori_data_static, parameters):
     ori_time, max_seq_len = extract_time(ori_data)
                 
     ori_data = np.array(ori_data)
-    ori_data_static = np.array(ori_data_static).reshape(10000, 24, 2) 
+    ori_data_static = np.array(ori_data_static)
     no_static, batch_size_static, dim_static = ori_data_static.shape
 
     dstack = np.dstack((ori_data, ori_data_static))
     #ori_data= dstack
     no, seq_len, dim = np.asarray(ori_data).shape
     ori_time, max_seq_len = extract_time(ori_data)
-    np.save('mix_data', dstack)
+    np.save('mix_data_2_dimension', dstack)
     
     
     def MinMaxScaler(data):
@@ -52,6 +54,8 @@ def timegan(ori_data, ori_data_static, parameters):
     dstack, min_val, max_val = MinMaxScaler(dstack)
     ori_data = dstack[:,:, :dim]
     ori_data_static = dstack[:,:, dim:]
+
+   
           
     ## Build a RNN networks          
   
@@ -108,6 +112,7 @@ def timegan(ori_data, ori_data_static, parameters):
         tf.keras.layers.Dense(hidden_dim, input_shape=(seq_len, dim_static)),
         tf.keras.layers.Dense(hidden_dim),
         tf.keras.layers.Dense(hidden_dim),
+        tf.keras.layers.Dense(hidden_dim),
         tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
         
         ])
@@ -147,6 +152,7 @@ def timegan(ori_data, ori_data_static, parameters):
         recovery_model_static = tf.keras.Sequential(name="recovery_static", layers= [
             
         tf.keras.layers.Dense(dim_static, input_shape=(batch_size_static, hidden_dim)),
+        tf.keras.layers.Dense(dim_static),
         tf.keras.layers.Dense(dim_static),
         tf.keras.layers.Dense(dim_static),
         tf.keras.layers.Dense(dim_static, activation=tf.nn.sigmoid)
@@ -255,6 +261,7 @@ def timegan(ori_data, ori_data_static, parameters):
         discriminator_model_static = tf.keras.Sequential(name="discriminator_static", layers= [
             
             tf.keras.layers.Dense(hidden_dim, input_shape=(seq_len, hidden_dim)),
+            tf.keras.layers.Dense(hidden_dim),
             tf.keras.layers.Dense(hidden_dim),
             tf.keras.layers.Dense(hidden_dim),
             tf.keras.layers.Dense(1, activation=None),
