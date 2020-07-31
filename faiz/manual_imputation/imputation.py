@@ -1,12 +1,15 @@
+import pdb
+
 import pandas as pd
 import numpy as np
 import time
 from datetime import date, timedelta
 
-start_time = time.time()
+
+start_time = time.time() #The time() function returns the number of seconds passed since epoch.
 
 # reading in and assigning values
-data = pd.read_csv('isaFull.tsv', '\t')
+data = pd.read_csv('/Users/xiaoyanchen/desktop/synthetic-data-service/isaFull.tsv', '\t')
 
 age_string = 'Age at visit (years) [EUPATH_0000113]'
 height_string = 'Height (cm) [EUPATH_0010075]'
