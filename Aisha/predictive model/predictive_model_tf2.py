@@ -13,34 +13,13 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.optimizers import *
 from tensorflow.keras.callbacks import History
 
-
-def extract_time (data):
-  """Returns Maximum sequence length and each sequence length.
-  
-  Args:
-    - data: original data
-    
-  Returns:
-    - time: extracted time information
-    - max_seq_len: maximum sequence length
-  """
-  time = list()
-  max_seq_len = 0
-  for i in range(len(data)):
-    max_seq_len = max(max_seq_len, len(data[i][:,0]))
-    time.append(len(data[i][:,0]))
-    
-  return time, max_seq_len
-
-
-
 #Load the pre-processed data - it randomly divides the whole data set into two parts, 
 #one is taken as the original data, the other is taken as the generated data
 #They are randomly permuted and normalised somehow (need to have a look at the normalisation)
 
 
 import numpy as np
-with open('/Users/xiaoyanchen/desktop/HDI/TimeGAN/metrics/metrics_v2/stock3ddata.npy', 'rb') as f:
+with open('stock3ddata.npy', 'rb') as f:
     ori_data = np.load(f)
     generated_data = np.load(f)
 
@@ -81,11 +60,6 @@ def last_time_step_mae(Y_true, Y_pred):
 
 # Basic Parameters
 no, seq_len, dim = np.asarray(ori_data).shape
-
-# Set maximum sequence length and each sequence length
-ori_time, ori_max_seq_len = extract_time(ori_data)
-generated_time, generated_max_seq_len = extract_time(ori_data)
-max_seq_len = max([ori_max_seq_len, generated_max_seq_len])  
 
 ## Builde a post-hoc RNN predictive network 
 # Network parameters
