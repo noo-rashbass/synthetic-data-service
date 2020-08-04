@@ -106,11 +106,13 @@ def sine_data_generation_mix(no, seq_len, dim):
   # Initialize the output
   data = list()
   data_static = list()
+  data_static_new = list()
   # Generate sine data
   for i in range(no):      
     # Initialize each time-series
     temp = list()
     temp_static = list()
+    temp_static_new = list()
     # For each feature
     
     for k in range(dim):
@@ -122,14 +124,23 @@ def sine_data_generation_mix(no, seq_len, dim):
     temp_static.append(temp_data)
     temp_data = [phase for _ in range(seq_len)]
     temp_static.append(temp_data)
+
+    temp_data_new = freq
+    temp_static_new.append(temp_data_new)
+    temp_data_new = phase
+    temp_static_new.append(temp_data_new)
+
+
     # Align row/column
     temp = np.transpose(np.asarray(temp)) 
     temp_static = np.transpose(np.asarray(temp_static))
+    temp_static_new = np.transpose(np.asarray(temp_static_new))
 
     # Stack the generated data
     data.append(temp)
-    data_static.append(temp_static)            
-  return data, data_static
+    data_static.append(temp_static)     
+    data_static_new.append(temp_static_new)       
+  return data, data_static, data_static_new
       
       
           

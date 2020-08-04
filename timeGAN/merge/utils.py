@@ -102,6 +102,26 @@ def random_generator (batch_size, z_dim, T_mb, max_seq_len):
     temp[:T_mb[i],:] = temp_Z
     Z_mb.append(temp_Z)
   return np.array(Z_mb)
+  
+def random_generator_static (batch_size, z_dim, T_mb, max_seq_len):
+  """Random vector generation.
+
+  Args:
+    - batch_size: size of the random vector
+    - z_dim: dimension of random vector
+    - T_mb: time information for the random vector
+    - max_seq_len: maximum sequence length
+    
+  Returns:
+    - Z_mb: generated random vector
+  """
+  Z_mb = list()
+  for i in range(batch_size):
+    temp = np.zeros([z_dim])
+    temp_Z = np.random.uniform(0., 1, z_dim)
+    
+    Z_mb.append(temp_Z)
+  return np.array(Z_mb)
 
 
 def batch_generator(data, data_static, time, batch_size):
@@ -116,7 +136,7 @@ def batch_generator(data, data_static, time, batch_size):
     - X_mb: time-series data in each batch
     - T_mb: time information in each batch
   """
-
+  
   no = len(data)
   idx = np.random.permutation(no)
   train_idx = idx[:batch_size]     

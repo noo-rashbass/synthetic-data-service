@@ -48,7 +48,7 @@ def main (args):
         #ori_data_static = sine_data_generation_static(no, args.seq_len, 1)
     elif args.data_name == 'normal':
         no, dim = 10000, 2
-        ori_data, ori_data_static = sine_data_generation_mix(no, args.seq_len, dim)
+        ori_data, ori_data_static, ori_data_s = sine_data_generation_mix(no, args.seq_len, dim)
     
         
     ## Synthetic data generation by TimeGAN
@@ -60,9 +60,9 @@ def main (args):
     parameters['iterations'] = args.iteration
     parameters['batch_size'] = args.batch_size
         
-    generated_data = timegan(ori_data, ori_data_static, parameters)   
+    generated_data = timegan(ori_data, ori_data_s, ori_data_static, parameters)   
     print('Finish Synthetic Data Generation')
-    np.save('gen_mix_data_2_dimension', generated_data)
+    np.save('gen_mix_data_no_seq_2k', generated_data)
     
     """
     ## Performance metrics   
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--iteration',
         help='Training iterations (should be optimized)',
-        default=5000,
+        default=2000,
         type=int)
     parser.add_argument(
         '--batch_size',
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     #     '--metric_iteration',
     #     help='iterations of the metric computation',
     #     default=10,
-    #     type=int)
+    #     type=int
     
     args = parser.parse_args() 
     
