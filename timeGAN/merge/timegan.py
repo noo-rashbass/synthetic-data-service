@@ -380,6 +380,12 @@ def timegan(ori_data, ori_data_static, parameters):
 
     
 
+    def add_dpnoise(gradients, clip, noise_multiplier):
+    	shape = gradient.get_shape().as_list()
+    	noise = tf.random_normal(shape, mean=0, stddev=clip*noise_multiplier )
+    	noisy_gradient = tf.add(gradient, noise)
+    	return noisy_gradient
+    	
     
     # optimizer
     embedder0_optimizer = tf.keras.optimizers.Adam()
@@ -393,6 +399,15 @@ def timegan(ori_data, ori_data_static, parameters):
     generator_static_optimizer = tf.keras.optimizers.Adam()
     discriminator_static_optimizer = tf.keras.optimizers.Adam()
 
+    # # Lulu: DP paramterers here for now but I have no idea what order of magnitude these parameters need to be
+    # clip_embedder_static = 
+    # noise_multiplier_embedder_static = 
+    # clip_embedder = 
+    # noise_multiplier_embedder = 
+    # clip_disc_static =
+    # noise_multiplier_disc_static = 
+    # clip_disc =
+    # noise_multiplier_disc =
 
     @tf.function
     def train_step_embedder_static(X_mb):
@@ -405,6 +420,8 @@ def timegan(ori_data, ori_data_static, parameters):
             embedder_0_loss = get_embedder_0_loss(X_mb, X_tilde_mb)
             emb_vars = embedder_model_static.trainable_variables + recovery_model_static.trainable_variables
             gradients_of_embedder = embedder_static_tape.gradient(embedder_0_loss, emb_vars)
+            # gradients_of_embedder = tf.clip_by_norm(gradients_of_embedder, clip_embedder_static) # Lulu: DP
+            # gradients_of_embedder = add_dpnoise(gradients_of_embedder, clip_embedder_static, noise_multiplier_embedder_static) # Lulu: DP
             embedder0_static_optimizer.apply_gradients(zip(gradients_of_embedder, emb_vars))
         
         return embedder_0_loss
@@ -422,6 +439,8 @@ def timegan(ori_data, ori_data_static, parameters):
             embedder_0_loss = get_embedder_0_loss(X_mb, X_tilde_mb)
             emb_vars = embedder_model.trainable_variables + recovery_model.trainable_variables
             gradients_of_embedder = embedder_tape.gradient(embedder_0_loss, emb_vars)
+            # gradients_of_embedder = tf.clip_by_norm(gradients_of_embedder, clip_embedder) # Lulu: DP
+            # gradients_of_embedder = add_dpnoise(gradients_of_embedder, clip_embedder, noise_multiplier_embedder) # Lulu: DP
             embedder0_optimizer.apply_gradients(zip(gradients_of_embedder, emb_vars))
         
         return embedder_0_loss
@@ -445,6 +464,7 @@ def timegan(ori_data, ori_data_static, parameters):
             gen_s_vars = supervisor_model.trainable_variables #removed possibly useless generator variables.
             #vars = [generator_model.trainable_vaiables, supervisor_model.trainable_variables]
             gradients_of_gen_s = gen_s_tape.gradient(gen_s_loss, gen_s_vars)
+            # Lulu: Don't think DP needed here. Generator trains on output of DP encoder
             gen_s_optimizer.apply_gradients(zip(gradients_of_gen_s, gen_s_vars))
 
           
@@ -482,6 +502,7 @@ def timegan(ori_data, ori_data_static, parameters):
             gen_loss, g_loss_u, gen_s_loss, g_loss_v = get_generator_loss(Y_fake_mb, Y_fake_e_mb, X_hat_mb, X_mb, H_mb, H_hat_supervise_mb)
             gen_vars = generator_model.trainable_variables + supervisor_model.trainable_variables
             gradients_of_gen = gen_tape.gradient(gen_loss, gen_vars)
+            # Lulu: possiply need DP here too
             generator_optimizer.apply_gradients(zip(gradients_of_gen, gen_vars))
         
         
@@ -502,6 +523,8 @@ def timegan(ori_data, ori_data_static, parameters):
             emb_loss = get_embedder_loss(X_mb, X_tilde_mb, H_mb, H_hat_supervise) 
             emb_vars = embedder_model.trainable_variables + recovery_model.trainable_variables
             gradients_of_emb = embedder_tape.gradient(emb_loss, emb_vars)
+            # gradients_of_embedder = tf.clip_by_norm(gradients_of_embedder, clip_embedder) # Lulu: DP
+            # gradients_of_embedder = add_dpnoise(gradients_of_embedder, clip_embedder, noise_multiplier_embedder) # Lulu: DP
             embedder_optimizer.apply_gradients(zip(gradients_of_emb, emb_vars))
         
         return emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v #H_hat_mb, E_hat_mb, 
@@ -526,6 +549,7 @@ def timegan(ori_data, ori_data_static, parameters):
             gen_loss, g_loss_v = get_generator_loss_static(Y_fake_e_mb, X_hat_mb, X_mb_static)
             gen_vars = generator_model_static.trainable_variables
             gradients_of_gen = gen_tape.gradient(gen_loss, gen_vars)
+            # Lulu: possiply need DP here too
             generator_static_optimizer.apply_gradients(zip(gradients_of_gen, gen_vars))
 
             
@@ -541,6 +565,8 @@ def timegan(ori_data, ori_data_static, parameters):
             emb_loss = get_embedder_0_loss(X_mb_static, X_tilde_mb) #Not sure which embedder loss to use
             emb_vars = embedder_model_static.trainable_variables + recovery_model_static.trainable_variables
             gradients_of_emb = embedder_tape.gradient(emb_loss, emb_vars)
+            # gradients_of_embedder = tf.clip_by_norm(gradients_of_embedder, clip_embedder_static) # Lulu: DP
+            # gradients_of_embedder = add_dpnoise(gradients_of_embedder, clip_embedder_static, noise_multiplier_embedder_static) # Lulu: DP
             embedder_static_optimizer.apply_gradients(zip(gradients_of_emb, emb_vars))
         
         return emb_T0_loss, emb_loss, g_loss_v 
@@ -573,6 +599,8 @@ def timegan(ori_data, ori_data_static, parameters):
                 #disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
                 disc_vars = discriminator_model.trainable_variables
                 gradients_of_disc = disc_tape.gradient(disc_loss, disc_vars)
+                # gradients_of_disc = tf.clip_by_norm(gradients_of_disc clip_disc) # Lulu: DP
+                # gradients_of_disc = add_dpnoise(gradients_of_disc, clip_disc, noise_multiplier_disc) # Lulu: DP
                 discriminator_optimizer.apply_gradients(zip(gradients_of_disc, disc_vars))
         
         return disc_loss
@@ -601,6 +629,8 @@ def timegan(ori_data, ori_data_static, parameters):
                 #disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
                 disc_vars = discriminator_model_static.trainable_variables
                 gradients_of_disc = disc_tape.gradient(disc_loss, disc_vars)
+                # gradients_of_disc = tf.clip_by_norm(gradients_of_disc clip_disc_static) # Lulu: DP
+                # gradients_of_disc = add_dpnoise(gradients_of_disc, clip_disc_static, noise_multiplier_disc_static) # Lulu: DP
                 discriminator_static_optimizer.apply_gradients(zip(gradients_of_disc, disc_vars))
         
         return disc_loss
