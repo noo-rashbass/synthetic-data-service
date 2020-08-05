@@ -22,6 +22,7 @@ data_loading.py
 
 ## Necessary Packages
 import numpy as np
+import pandas as pd
 
 
 def MinMaxScaler(data):
@@ -96,7 +97,7 @@ def real_data_loading (data_name, seq_len):
   elif data_name == 'prism':
     ori_data = np.genfromtxt('data/first_patient_small.csv', delimiter = ",",skip_header=1)#, filling_values=0)
   elif data_name == "sine_sampling":
-    ori_data = np.loadtxt('data/sine_30000_sampling80_dt.csv', delimiter= ",", skiprows=1)
+    ori_data = np.loadtxt('data/sine_30000_sampling50.csv', delimiter= ",", skiprows=1)
   
 
   # Flip the data to make chronological data
@@ -120,3 +121,37 @@ def real_data_loading (data_name, seq_len):
     
   return temp_data
 
+def real_data_loading_prism_dt():
+
+  data = pd.read_csv('data/time_patients_25to50visits.csv')
+
+  min_val = data.min()
+  max_val = data.max()
+
+  scaled_data = (data - min_val) / (max_val - min_val + 1e-7)
+  scaled_data = scaled_data.fillna(-1)
+
+  id_unique = scaled_data.id.unique()
+
+  row_list =[] 
+  j = 0
+  #iterate over id
+  for i in id_unique:  
+      id_list = []
+      count = 0
+      for index, rows in scaled_data[j:j+51].iterrows(): 
+          # get row of the same id 
+          if rows.id == i:
+              count +=1
+              my_list =[rows.day_num, rows.height, rows.weight, rows.temp, rows.vomit_dur, rows.cough_dur]
+        
+              #append a row to its id list
+              id_list.append(my_list) 
+      #append the id list to the whole patients list
+      row_list.append((id_list))
+      j +=count
+  
+  min_val = min_val.drop('id')
+  max_val = max_val.drop('id') 
+
+  return np.asarray(row_list), min_val, max_val

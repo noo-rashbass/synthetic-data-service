@@ -83,7 +83,7 @@ def rnn_cell(module_name, hidden_dim, return_sequences=False, input_shape=None):
   return rnn_cell
 
 
-def random_generator (batch_size, z_dim, T_mb, max_seq_len):
+def random_generator_ori (batch_size, z_dim, T_mb, max_seq_len):
   """Random vector generation.
   
   Args:
@@ -103,8 +103,8 @@ def random_generator (batch_size, z_dim, T_mb, max_seq_len):
     Z_mb.append(temp_Z)
   return np.array(Z_mb)
 
-
-def batch_generator(data, time, batch_size):
+#original one from the timegan code
+def batch_generator_ori(data, time, batch_size):
   """Mini-batch generator.
   
   Args:
@@ -125,3 +125,23 @@ def batch_generator(data, time, batch_size):
   T_mb = np.array([time[i] for i in train_idx])
   
   return X_mb, T_mb
+
+def batch_generator(data, batch_size):
+
+
+  no = len(data)
+  idx = np.random.permutation(no)
+  train_idx = idx[:batch_size]     
+            
+  X_mb = np.array([data[i] for i in train_idx])
+  
+  return X_mb
+
+def random_generator (batch_size, z_dim, max_seq_len):
+  Z_mb = list()
+  for i in range(batch_size):
+    temp = np.zeros([max_seq_len, z_dim])
+    temp_Z = np.random.uniform(0., 1, [max_seq_len, z_dim])
+    #temp[:T_mb[i],:] = temp_Z
+    Z_mb.append(temp_Z)
+  return np.array(Z_mb)
