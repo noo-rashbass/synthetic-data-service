@@ -280,19 +280,17 @@ def timegan(ori_data, parameters):
         return embedder_0_loss
 
     @tf.function
-    def train_step_generator_s(X_mb, Z_mb):
+    def train_step_generator_s(X_mb):
         
         with tf.GradientTape() as gen_s_tape: #, tf.GradientTape() as s_tape:
             
             H_mb = embedder_model(X_mb) #recall
             
             # Generator
-            E_hat_mb = generator_model(Z_mb)
-            H_hat_mb = supervisor_model(E_hat_mb)
             H_hat_supervise_mb = supervisor_model(H_mb)
 
             gen_s_loss = get_generator_s_loss(H_mb, H_hat_supervise_mb) #hot sure if i should do whole gen loss or only gen_s loss
-            gen_s_vars = generator_model.trainable_variables + supervisor_model.trainable_variables 
+            gen_s_vars = supervisor_model.trainable_variables #removed possibly useless generator variables.
             #vars = [generator_model.trainable_variables, supervisor_model.trainable_variables]
             gradients_of_gen_s = gen_s_tape.gradient(gen_s_loss, gen_s_vars)
             gen_s_optimizer.apply_gradients(zip(gradients_of_gen_s, gen_s_vars))
@@ -379,7 +377,7 @@ def timegan(ori_data, parameters):
         #1. Embedding network training
         print('Start Embedding Network Training')
 
-        for itt in range(iterations):
+        for itt in range(1):
             # Set mini-batch
             X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size) 
             # Train embedder
@@ -397,10 +395,9 @@ def timegan(ori_data, parameters):
         for itt in range(iterations):
             # Set mini-batch
             X_mb, T_mb = batch_generator(ori_data, ori_time, batch_size)
-            # Random vector generation 
-            Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
+            
             # Train generator
-            step_gen_s_loss = train_step_generator_s(X_mb, Z_mb)
+            step_gen_s_loss = train_step_generator_s(X_mb)
 
             # Checkpoint
             if itt % 1 == 0:
