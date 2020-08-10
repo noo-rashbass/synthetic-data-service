@@ -383,7 +383,34 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         G_loss = gamma * G_loss_U_e +  100*G_loss_V
         return G_loss,  G_loss_V
     
-      
+    def get_generator_loss_both(Y_fake, Y_fake_e, X_hat, X, H, H_hat_supervise, Y_fake_e_static, X_hat_static, X_static):
+        """
+        returns generator loss
+        """
+        #1. Adversarial loss
+        bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        G_loss_U = bce(tf.ones_like(Y_fake), Y_fake)
+        G_loss_U_e = bce(tf.ones_like(Y_fake_e), Y_fake_e)
+        G_loss_U_e_static = bce(tf.ones_like(Y_fake_e_static), Y_fake_e_static)
+
+        #2. Two Moments
+        X = tf.convert_to_tensor(X)
+        G_loss_V1 = tf.reduce_mean(tf.abs(tf.sqrt(tf.nn.moments(X_hat,[0])[1] + 1e-6) - tf.sqrt(tf.nn.moments(X,[0])[1] + 1e-6)))
+        G_loss_V2 = tf.reduce_mean(tf.abs((tf.nn.moments(X_hat,[0])[0]) - (tf.nn.moments(X,[0])[0])))
+        G_loss_V = G_loss_V1 + G_loss_V2
+
+        X_static = tf.convert_to_tensor(X_static)
+        G_loss_V1_static = tf.reduce_mean(tf.abs(tf.sqrt(tf.nn.moments(X_hat_static,[0])[1] + 1e-6) - tf.sqrt(tf.nn.moments(X_static,[0])[1] + 1e-6)))
+        G_loss_V2_static = tf.reduce_mean(tf.abs((tf.nn.moments(X_hat_static,[0])[0]) - (tf.nn.moments(X_static,[0])[0])))
+        G_loss_V_static = G_loss_V1_static + G_loss_V2_static
+
+        #3. Supervised loss
+        G_loss_S = get_generator_s_loss(H, H_hat_supervise)
+
+        #4. Summation
+        G_loss = G_loss_U + gamma * G_loss_U_e + 100 * tf.sqrt(G_loss_S) + 100*G_loss_V + gamma * G_loss_U_e_static + 100 * G_loss_V_static
+        return G_loss, G_loss_U, G_loss_S, G_loss_V, G_loss_V_static
+
         
     def get_discriminator_loss(Y_real, Y_fake, Y_fake_e):
         """
@@ -408,7 +435,23 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         D_loss = D_loss_real + gamma * D_loss_fake_e
         return D_loss
 
-    
+    def get_discriminator_loss_both(Y_real, Y_fake, Y_fake_e, Y_real_static, Y_fake_e_static):
+        """
+        returns discrminator loss for both static and temporal
+        """
+        bce = tf.keras.losses.BinaryCrossentropy(from_logits=True) #loss for cls of latent real data seq
+        #default arg for tf.keras.losses.BinaryCrossentropy reduction=losses_utils.ReductionV2.AUTO
+        D_loss_real = bce(tf.ones_like(Y_real), Y_real)
+        D_loss_fake = bce(tf.zeros_like(Y_fake), Y_fake) #loss for cls of latent synthethic data seq
+        D_loss_fake_e = bce(tf.zeros_like(Y_fake_e), Y_fake_e) #loss for cls of latent synthetic data
+
+        D_loss_real_static = bce(tf.ones_like(Y_real_static), Y_real_static)
+        D_loss_fake_e_static = bce(tf.zeros_like(Y_fake_e_static), Y_fake_e_static)
+
+        D_loss_temporal = D_loss_real + D_loss_fake + gamma * D_loss_fake_e 
+        D_loss_static = D_loss_real_static + D_loss_fake_e_static * gamma
+        D_loss = D_loss_temporal + D_loss_static
+        return D_loss, D_loss_static
 
     
     # optimizer
@@ -588,6 +631,90 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         
         return emb_T0_loss, emb_loss, g_loss_v 
 
+    @tf.function
+    def train_step_joint_both(X_mb, X_mb_static, Z_mb, Z_mb_static):
+        #train generator - temporal + static
+        with tf.GradientTape() as gen_tape:
+            
+            #Embeddings
+            H_mb = embedder_model(X_mb) 
+            H_mb_static_1 = embedder_model_static(X_mb_static)
+
+            H_mb_static = tf.expand_dims(H_mb_static_1, axis=1)
+            H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
+
+            #Combine static and temporal features
+            H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
+            
+            E_hat_mb = generator_model(Z_mb)
+            E_hat_mb_static_1 = generator_model_static(Z_mb_static)
+
+            E_hat_mb_static = tf.expand_dims(E_hat_mb_static_1, axis=1)
+            E_hat_mb_static = tf.repeat(E_hat_mb_static, seq_len, axis=1)
+
+            #Combine static generator with temporal generator
+            E_hat_mb_mix = tf.concat([E_hat_mb, E_hat_mb_static], axis=2)
+                        
+            H_hat_mb = supervisor_model(E_hat_mb_mix) 
+            H_hat_supervise_mb = supervisor_model(H_mb_mix) 
+
+            # Synthetic data
+            X_hat_mb = recovery_model(H_hat_mb)
+            
+            # Discriminator
+            Y_fake_mb = discriminator_model(H_hat_mb)
+            Y_fake_e_mb = discriminator_model(E_hat_mb)         
+              
+            ###### STATIC   
+            # Synthetic data
+            X_hat_mb_static = recovery_model_static(E_hat_mb_static_1)
+            
+            # Discriminator
+            Y_fake_e_mb_static = discriminator_model_static(E_hat_mb_static_1)
+
+            gen_loss, g_loss_u, gen_s_loss, g_loss_v, g_loss_v_static = get_generator_loss_both(Y_fake_mb, Y_fake_e_mb, X_hat_mb, X_mb, H_mb, H_hat_supervise_mb, Y_fake_e_mb_static, X_hat_mb_static, X_mb_static)
+            gen_vars = generator_model.trainable_variables + supervisor_model.trainable_variables + generator_model_static.trainable_variables
+            gradients_of_gen = gen_tape.gradient(gen_loss, gen_vars)
+            generator_optimizer.apply_gradients(zip(gradients_of_gen, gen_vars))
+        
+        
+        #train embedder - temporal
+        with tf.GradientTape() as embedder_tape:
+
+            H_mb = embedder_model(X_mb) #recall
+            H_mb_static = embedder_model_static(X_mb_static)
+
+            X_tilde_mb = recovery_model(H_mb) 
+            
+            H_mb_static = tf.expand_dims(H_mb_static, axis=1)
+            H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
+
+            H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
+            H_hat_supervise = supervisor_model(H_mb_mix) #called in order to get emb_loss
+            
+            #not sure if this should be E_loss or E_loss_T0 
+            #i think we are minimizing E_loss but printing out E_loss_T0??
+            emb_T0_loss = get_embedder_T0_loss(X_mb, X_tilde_mb)
+            emb_loss = get_embedder_loss(X_mb, X_tilde_mb, H_mb, H_hat_supervise) 
+            emb_vars = embedder_model.trainable_variables + recovery_model.trainable_variables
+            gradients_of_emb = embedder_tape.gradient(emb_loss, emb_vars)
+            embedder_optimizer.apply_gradients(zip(gradients_of_emb, emb_vars))
+        
+        #train embedder - static
+        with tf.GradientTape() as embedder_tape:
+
+            H_mb_static = embedder_model_static(X_mb_static)
+
+            X_tilde_mb_static = recovery_model_static(H_mb_static) 
+                      
+            emb_T0_loss_static = get_embedder_T0_loss(X_mb_static, X_tilde_mb_static)
+            emb_loss_static = get_embedder_0_loss(X_mb_static, X_tilde_mb_static) #Not sure which embedder loss to use
+            emb_vars_static = embedder_model_static.trainable_variables + recovery_model_static.trainable_variables
+            gradients_of_emb_static = embedder_tape.gradient(emb_loss_static, emb_vars_static)
+            embedder_static_optimizer.apply_gradients(zip(gradients_of_emb_static, emb_vars_static))
+        
+        return emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v, emb_T0_loss_static, g_loss_v_static
+
     ##CHECK DISCRIM FOR CORRECT PROCESS
     @tf.function
     def train_step_discriminator(X_mb, X_mb_static, Z_mb, Z_mb_static):
@@ -658,6 +785,50 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         
         return disc_loss
 
+    @tf.function
+    def train_step_discriminator_both(X_mb, X_mb_static, Z_mb, Z_mb_static):
+        
+        #training discriminator - temporal + static
+        with tf.GradientTape() as disc_tape:
+            
+            H_mb = embedder_model(X_mb)
+            H_mb_static_1 = embedder_model_static(X_mb_static)
+
+            H_mb_static = tf.expand_dims(H_mb_static_1, axis=1)
+            H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
+            H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
+
+            E_hat_mb = generator_model(Z_mb)
+            E_hat_mb_static_1 = generator_model_static(Z_mb_static)
+
+            E_hat_mb_static = tf.expand_dims(E_hat_mb_static_1, axis=1)
+            E_hat_mb_static = tf.repeat(E_hat_mb_static, seq_len, axis=1)
+            
+            E_hat_mb_mix = tf.concat([E_hat_mb, E_hat_mb_static], axis=2)
+            H_hat_mb = supervisor_model(E_hat_mb_mix) 
+            
+            # Synthetic data
+            X_hat_mb = recovery_model(H_hat_mb)
+            
+            # Discriminator
+            Y_fake_mb = discriminator_model(H_hat_mb)
+            Y_real_mb = discriminator_model(H_mb)
+            Y_fake_e_mb = discriminator_model(E_hat_mb)
+
+            ### Discriminator static
+            Y_real_mb_static = discriminator_model_static(H_mb_static_1)
+            Y_fake_e_mb_static = discriminator_model_static(E_hat_mb_static_1)
+
+            # Check discriminator loss before updating
+            disc_loss, disc_loss_static = get_discriminator_loss_both(Y_real_mb, Y_fake_mb, Y_fake_e_mb, Y_real_mb_static, Y_fake_e_mb_static)
+            # Train discriminator (only when the discriminator does not work well)
+            if (disc_loss > 0.15):
+                disc_vars = discriminator_model.trainable_variables + discriminator_model_static.trainable_variables
+                gradients_of_disc = disc_tape.gradient(disc_loss, disc_vars)
+                discriminator_optimizer.apply_gradients(zip(gradients_of_disc, disc_vars))
+        
+        return disc_loss, disc_loss_static
+
     #timeGAN training
     def train():
         #1. Embedding static network training
@@ -707,38 +878,10 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         print('Finish Training with Supervised Loss Only')
         
         # 3. Joint Training
-        # print('Start Joint Training')
+        print('Start Joint Training')
 
         for itt in range(iterations):
-            # Static
-            # Generator training (twice more than discriminator training)
-            
-            for kk in range(2):
-                # Set mini-batch
-                X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size) 
-                # Random vector generation
-                Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-                # Train generator and embedder
-                emb_T0_loss, emb_loss, g_loss_v = train_step_joint_static(X_mb, X_mb_static, Z_mb)
-                
-            # Discriminator training        
-            # Set mini-batch
-            X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)           
-            # Random vector generation
-            Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-            #train discriminator
-            d_loss = train_step_discriminator_static(X_mb, X_mb_static, Z_mb)
 
-            # Print multiple checkpoints
-            if itt % 200 == 0:
-                print('step: '+ str(itt) + '/' + str(iterations) + 
-                    ', d_loss: ' + str(np.round(d_loss,4)) + 
-                    ', g_loss_v: ' + str(np.round(g_loss_v,4)) + 
-                    ', e_loss_t0: ' + str(np.round(np.sqrt(emb_T0_loss),4))  )
-                
-       
-            #Temporal
-            
             # Generator training (twice more than discriminator training)
             for kk in range(2):
                 # Set mini-batch
@@ -747,7 +890,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
                 Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
                 Z_mb_static = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
                 # Train generator and embedder
-                emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v = train_step_joint(X_mb, X_mb_static, Z_mb, Z_mb_static)
+                emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v, emb_T0_loss_static, g_loss_v_static = train_step_joint_both(X_mb, X_mb_static, Z_mb, Z_mb_static)
             
             # Discriminator training        
             # Set mini-batch
@@ -756,7 +899,60 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
             Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
             Z_mb_static = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
             #train discriminator
-            d_loss = train_step_discriminator(X_mb, X_mb_static, Z_mb, Z_mb_static)
+            d_loss, d_loss_static = train_step_discriminator_both(X_mb, X_mb_static, Z_mb, Z_mb_static)
+
+
+        #     # Static
+        #     # Generator training (twice more than discriminator training)
+
+        # for itt in range(iterations):
+            
+        #     for kk in range(2):
+        #         # Set mini-batch
+        #         X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size) 
+        #         # Random vector generation
+        #         Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
+        #         # Train generator and embedder
+        #         emb_T0_loss, emb_loss, g_loss_v = train_step_joint_static(X_mb, X_mb_static, Z_mb)
+                
+        #     # Discriminator training        
+        #     # Set mini-batch
+        #     X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)           
+        #     # Random vector generation
+        #     Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
+        #     #train discriminator
+        #     d_loss = train_step_discriminator_static(X_mb, X_mb_static, Z_mb)
+
+        #     # Print multiple checkpoints
+        #     if itt % 200 == 0:
+        #         print('step: '+ str(itt) + '/' + str(iterations) + 
+        #             ', d_loss: ' + str(np.round(d_loss,4)) + 
+        #             ', g_loss_v: ' + str(np.round(g_loss_v,4)) + 
+        #             ', e_loss_t0: ' + str(np.round(np.sqrt(emb_T0_loss),4))  )
+                
+       
+        #     #Temporal
+            
+        #     # Generator training (twice more than discriminator training)
+        #     for kk in range(2):
+        #         # Set mini-batch
+        #         X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size) 
+        #         # Random vector generation
+        #         Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
+        #         Z_mb_static = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
+        #         # Train generator and embedder
+        #         emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v = train_step_joint(X_mb, X_mb_static, Z_mb, Z_mb_static)
+            
+        #     # Discriminator training        
+        #     # Set mini-batch
+        #     X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)           
+        #     # Random vector generation
+        #     Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
+        #     Z_mb_static = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
+        #     #train discriminator
+        #     d_loss = train_step_discriminator(X_mb, X_mb_static, Z_mb, Z_mb_static)
+
+
 
             # Print multiple checkpoints
             if itt % 200 == 0:
@@ -765,10 +961,9 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
                     ', g_loss_u: ' + str(np.round(g_loss_u,4)) + 
                     ', g_loss_s: ' + str(np.round(np.sqrt(gen_s_loss),4)) + 
                     ', g_loss_v: ' + str(np.round(g_loss_v,4)) + 
-                    ', e_loss_t0: ' + str(np.round(np.sqrt(emb_T0_loss),4))  )
-                
-            
-           
+                    ', e_loss_t0: ' + str(np.round(np.sqrt(emb_T0_loss),4)) +
+                    ', d_loss_static: ' + str(np.round(d_loss_static,4)) + 
+                    ', g_loss_v_static: ' + str(np.round(g_loss_v_static,4)) )      
             
             
         
