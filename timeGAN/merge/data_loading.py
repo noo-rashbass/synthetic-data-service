@@ -22,8 +22,9 @@ data_loading.py
 
 ## Necessary Packages
 import numpy as np
-
-
+import pandas as pd
+import os
+import sys
 def MinMaxScaler(data):
   """Min Max normalizer.
   
@@ -113,3 +114,120 @@ def real_data_loading (data_name, seq_len):
     data.append(temp_data[idx[i]])
     
   return data
+
+
+def real_data_loading_prism():
+
+  def dday(x):
+    try:
+        if data['id'][x.name] == data['id'][x.name - 1]:
+            return (data['visit_date'][x.name] - data['visit_date'][x.name-1]).days
+        else:
+            return 0
+    except KeyError:
+        return 0
+
+  
+  data = pd.read_csv('.\\timeGAN\\merge\\data\\prism.csv')
+  
+  data = data[['Household_Id', 'Participant_Id', 'Visit date [EUPATH_0000091]', 'Weight (kg) [EUPATH_0000732]', 'Temperature (C) [EUPATH_0000110]', 'Age at visit (years) [EUPATH_0000113]', 'Height (cm) [EUPATH_0010075]']]
+  data.columns = ['house_id', 'id', 'visit_date', 'weight', 'temp', 'age', 'height']
+  
+  data = data[data['visit_date'].isna() == False]
+  data['visit_date'] = pd.to_datetime(data.visit_date)
+  data.sort_values(['id', 'visit_date'], inplace=True)
+  data.set_index(pd.Index(np.arange(len(data))), inplace=True)
+
+  data['dday'] = data.apply(dday, axis=1)
+  one_hot = pd.get_dummies(data['house_id'], drop_first=True)
+  df = data.drop(['visit_date', 'house_id'], axis=1)
+  df = df.join(one_hot)
+  normalized_df=(df-df.min())/(df.max()-df.min())
+  normalized_df['id'] = df['id']
+
+  dimensions = ['dday', 'weight', 'height', 'age', 'temp']
+  max_ = []
+  min_ = []
+  for dim in dimensions:
+    max_.append(data[dim].max())
+    min_.append(data[dim].min())
+  def format(data, min_, max_):
+    data.interpolate(method = 'linear', inplace=True)
+    #np.savez('./data/prism/data_train', data)
+    dimensions = ['dday', 'weight', 'height', 'age', 'temp']
+    
+    
+    
+    id_unique = data.id.unique()
+    features = []
+    attributes = []
+    gen_flag = []
+    for i in id_unique:
+        child = np.array(data.loc[data['id'] == i][dimensions])
+        if len(child) >= 5:
+          if len(child) < 130:
+            min_ = [0]*len(dimensions)
+          gen_flag.append(np.concatenate([np.ones(len(child)), np.zeros(130-len(child))]))   
+          child = np.pad(child, ((0, 130-len(child)), (0,0)))
+          features.append(child)
+          attributes.append(np.array(df.loc[df['id'] == i].iloc[:, 6:])[0])
+          
+          
+    return np.array(features), np.array(attributes), np.array(gen_flag), min_, max_
+
+  
+    
+  return format(normalized_df, min_, max_)
+
+
+def renormalize(data, min_, max_):
+  for child in data:
+    new_child=[]
+    for row in child:
+      new_row = np.multiply(row, np.subtract(max_, min_))#np.apply_along_axis(np.multiply, 0, row, np.subtract(max_, min_))
+
+      new_row = np.add(new_row, min_)#np.apply_along_axis(np.add, 0, row, min_)
+      
+      new_child.append(np.array(new_row))
+    new_child = np.expand_dims(new_child, axis=0)
+    try:
+      new_data = np.vstack([new_data, new_child])
+    except UnboundLocalError:
+      new_data = new_child
+    
+  
+  return np.array(new_data)
+
+
+def add_gen_flag(data_feature, data_gen_flag,
+                 sample_len):
+    
+
+    if len(data_gen_flag.shape) != 2:
+        raise Exception("data_gen_flag should be 2 dimension")
+
+    num_sample, length = data_gen_flag.shape
+
+    data_gen_flag = np.expand_dims(data_gen_flag, 2)
+
+    
+    shift_gen_flag = np.concatenate(
+        [data_gen_flag[:, 1:, :],
+         np.zeros((data_gen_flag.shape[0], 1, 1))],
+        axis=1)
+    if length % sample_len != 0:
+        raise Exception("length must be a multiple of sample_len")
+    data_gen_flag_t = np.reshape(
+        data_gen_flag,
+        [num_sample, int(length / sample_len), sample_len])
+    data_gen_flag_t = np.sum(data_gen_flag_t, 2)
+    data_gen_flag_t = data_gen_flag_t > 0.5
+    data_gen_flag_t = np.repeat(data_gen_flag_t, sample_len, axis=1)
+    data_gen_flag_t = np.expand_dims(data_gen_flag_t, 2)
+    data_feature = np.concatenate(
+        [data_feature,
+         shift_gen_flag,
+         (1 - shift_gen_flag) * data_gen_flag_t],
+        axis=2)
+
+    return data_feature

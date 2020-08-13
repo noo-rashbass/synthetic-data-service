@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore")
 tf.keras.backend.set_floatx('float64')
 
 def timegan(ori_data, parameters):
+    
 
     # Basic Parameters
     no, seq_len, dim = np.asarray(ori_data).shape

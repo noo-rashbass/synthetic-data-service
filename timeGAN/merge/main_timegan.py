@@ -4,6 +4,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import sys
 import numpy as np
 import warnings
 warnings.filterwarnings("ignore")
@@ -11,7 +12,7 @@ warnings.filterwarnings("ignore")
 # 1. TimeGAN model
 from timegan import timegan
 # 2. Data loading
-from data_loading import real_data_loading, sine_data_generation
+from data_loading import real_data_loading, sine_data_generation, real_data_loading_prism, add_gen_flag
 # 3. Metrics
 #from metrics.discriminative_metrics import discriminative_score_metrics
 #from metrics.predictive_metrics import predictive_score_metrics
@@ -44,6 +45,11 @@ def main (args):
         # Set number of samples and its dimensions
         no, dim = 10000, 5
         ori_data = sine_data_generation(no, args.seq_len, dim)
+    elif args.data_name == 'prism':
+        ori_data, _, flags, __, ___ = real_data_loading_prism()
+        sample_len = ori_data.shape[1]
+        
+        ori_data = add_gen_flag(ori_data, flags, sample_len)
         
     print(args.data_name + ' dataset is ready.')
         
@@ -97,8 +103,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--data_name',
-        choices=['sine','stock','energy'],
-        default='stock',
+        choices=['sine','stock','energy', 'prism'],
+        default='prism',
         type=str)
     parser.add_argument(
         '--seq_len',
