@@ -88,7 +88,7 @@ def real_data_loading (data_name, seq_len):
   Returns:
     - data: preprocessed data.
   """  
-  assert data_name in ['stock','energy', 'prism', 'sine_sampling']
+  assert data_name in ['stock','energy', 'prism', 'prism_padding']
   
   if data_name == 'stock':
     ori_data = np.loadtxt('data/stock_data.csv', delimiter = ",",skiprows = 1)
@@ -99,9 +99,11 @@ def real_data_loading (data_name, seq_len):
     ori_data = pd.read_csv('data/dt_10visits_noid.csv')
     ori_data.interpolate(method = 'linear', inplace=True)
     ori_data = np.asarray(ori_data)
-  elif data_name == "sine_sampling":
-    ori_data = np.loadtxt('data/sine_30000_sampling50.csv', delimiter= ",", skiprows=1)
-  
+  elif data_name == "prism_padding":
+    #so that the interpolate method can be used to fillnas
+    ori_data = pd.read_csv('data/500_imputed_patients.csv')
+    ori_data.interpolate(method = 'linear', inplace=True)
+    ori_data = np.asarray(ori_data)
 
   # Flip the data to make chronological data
   if data_name == "stock" or data_name == "energy":

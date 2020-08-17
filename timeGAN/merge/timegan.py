@@ -30,10 +30,10 @@ def timegan(ori_data, parameters):
         - min_val: minimum values (for renormalization)
         - max_val: maximum values (for renormalization)
         """    
-        min_val = np.min(np.min(data, axis = 0), axis = 0)
+        min_val = np.nanmin(np.nanmin(data, axis = 0), axis = 0)
         data = data - min_val
         
-        max_val = np.max(np.max(data, axis = 0), axis = 0)
+        max_val = np.nanmax(np.nanmax(data, axis = 0), axis = 0)
         norm_data = data / (max_val + 1e-7)
         
         return norm_data, min_val, max_val
@@ -87,15 +87,6 @@ def timegan(ori_data, parameters):
         for i in range(num_layers):
             recovery_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         recovery_model.add(tf.keras.layers.Dense(dim, activation='sigmoid'))
-
-        # r_cell = tf.keras.layers.StackedRNNCells([rnn_cell(module_name, hidden_dim) for _ in range(num_layers)])
-        # recovery_model = tf.keras.Sequential([
-                                   
-        #     tf.keras.layers.RNN(r_cell, return_sequences=True), 
-                       
-        #     tf.keras.layers.Dense(dim, activation=tf.nn.sigmoid)
-
-        #   ])
 
         return recovery_model
   
@@ -393,7 +384,7 @@ def timegan(ori_data, parameters):
             step_e_loss = train_step_embedder(X_mb)
            
             # Checkpoint
-            if itt % 1 == 0:
+            if itt % 100 == 0:
                 print('step: '+ str(itt) + '/' + str(iterations) + ', e_loss: ' + str(np.round(np.sqrt(step_e_loss),4)) )
 
         print('Finish Embedding Network Training')
@@ -409,7 +400,7 @@ def timegan(ori_data, parameters):
             step_gen_s_loss = train_step_generator_s(X_mb)
 
             # Checkpoint
-            if itt % 1 == 0:
+            if itt % 100 == 0:
                 print('step: '+ str(itt)  + '/' + str(iterations) +', s_loss: ' + str(np.round(np.sqrt(step_gen_s_loss),4)) )
 
         print('Finish Training with Supervised Loss Only')
@@ -436,7 +427,7 @@ def timegan(ori_data, parameters):
             d_loss = train_step_discriminator(X_mb, Z_mb)
 
             # Print multiple checkpoints
-            if itt % 1 == 0:
+            if itt % 100 == 0:
                 print('step: '+ str(itt) + '/' + str(iterations) + 
                     ', d_loss: ' + str(np.round(d_loss,4)) + 
                     ', g_loss_u: ' + str(np.round(g_loss_u,4)) + 
