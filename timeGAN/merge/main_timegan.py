@@ -38,7 +38,7 @@ def main (args):
         - metric_results: discriminative and predictive scores
     """
     ## Data loading
-    if args.data_name in ['stock', 'energy']:
+    if args.data_name in ['stock', 'energy', 'prism']:
         ori_data = real_data_loading(args.data_name, args.seq_len)
     elif args.data_name == 'sine':
         # Set number of samples and its dimensions
@@ -55,6 +55,7 @@ def main (args):
     parameters['num_layer'] = args.num_layer
     parameters['iterations'] = args.iteration
     parameters['batch_size'] = args.batch_size
+    parameters['loss'] = args.loss
         
     generated_data = timegan(ori_data, parameters)   
     print('Finish Synthetic Data Generation')
@@ -97,13 +98,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--data_name',
-        choices=['sine','stock','energy'],
-        default='stock',
+        choices=['sine','stock','energy','prism'],
+        default='prism',
         type=str)
     parser.add_argument(
         '--seq_len',
         help='sequence length',
-        default=24,
+        default=10,
         type=int)
     parser.add_argument(
         '--module',
@@ -130,6 +131,11 @@ if __name__ == '__main__':
         help='the number of samples in mini-batch (should be optimized)',
         default=128,
         type=int)
+    parser.add_argument(
+        '--loss',
+        choices=['bce','wgan_gp'],
+        default='bce',
+        type=str)
     # parser.add_argument(
     #     '--metric_iteration',
     #     help='iterations of the metric computation',
@@ -143,4 +149,4 @@ if __name__ == '__main__':
 
 
 # example command to run code, type in terminal
-# python main_timegan_v6.py --data_name sine --seq_len 9 --module gru --hidden_dim 3 --num_layer 3 --iteration 5 --batch_size 4
+# python main_timegan.py --data_name prism --seq_len 10 --module gru --hidden_dim 3 --num_layer 3 --iteration 5 --batch_size 4 --loss bce
