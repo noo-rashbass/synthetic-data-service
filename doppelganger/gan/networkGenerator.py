@@ -12,7 +12,7 @@ import sys
 import output
 sys.modules["output"] = output
 from data_loading import sine_data_generation_f_a, real_data_loading_prism, renormalize
-tf.keras.backend.set_floatx('float64')
+#tf.keras.backend.set_floatx('float32')
 
 class RNNInitialStateType(Enum):
     ZERO = "ZERO"
