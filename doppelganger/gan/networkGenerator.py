@@ -11,7 +11,7 @@ import os
 import sys
 import output
 sys.modules["output"] = output
-#from data_loading import sine_data_generation_f_a, real_data_loading_prism, renormalize
+from data_loading import sine_data_generation_f_a, real_data_loading_prism, renormalize
 tf.keras.backend.set_floatx('float64')
 
 class RNNInitialStateType(Enum):
@@ -266,7 +266,7 @@ class DoppelGANgerGenerator(tf.keras.Model):
                 batch_size, tf.float64)
         elif self.initial_state == RNNInitialStateType.RANDOM:
             
-            input_ = tf.random.normal([1, 100, 1])
+            input_ = tf.random.normal([batch_size, self.attribute_num_units, 1]) ### Not sure if i got this right
             
             _, initial_state = rnn_network(input_)
             
@@ -304,6 +304,16 @@ class DoppelGANgerGenerator(tf.keras.Model):
         def compute(i, state, last_output, all_output,
                             gen_flag, all_gen_flag, all_cur_argmax,
                             last_cell_output):
+
+            print(i)
+            print(state.dtype)
+            print(last_output.dtype)
+            print(all_output.dtype)
+            print(gen_flag.dtype)
+            print(all_gen_flag.dtype)
+            print(all_cur_argmax.dtype)
+            print(last_cell_output.dtype)
+            
             input_all = [all_discrete_attribute]
             
             
@@ -322,10 +332,13 @@ class DoppelGANgerGenerator(tf.keras.Model):
 
             
             input_all = tf.expand_dims(input_all, axis=2)
-          
+
+            
             
             cell_new_output, new_state = rnn_network(input_all, initial_state=state)
-            
+
+
+
             new_output_all = []
             id_ = 0
             for j in range(self.sample_len):
@@ -371,14 +384,14 @@ class DoppelGANgerGenerator(tf.keras.Model):
                 gen_flag = gen_flag * cur_gen_flag
 
                 
-            return (i + 1,
+            return (tf.cast(i + 1, dtype=tf.int32),
                     new_state,
-                    new_output,
+                    tf.cast(new_output, dtype=tf.float32),
                     all_output.write(i, tf.cast(new_output, dtype=tf.float32)),
-                    gen_flag,
+                    tf.cast(gen_flag, dtype=tf.float32),
                     all_gen_flag,
                     all_cur_argmax,
-                    cell_new_output) 
+                    tf.cast(cell_new_output, dtype=tf.float32)) ###lots of dirty work going on here. Hopefully fix later
 
         (i, state, _, feature, _, gen_flag, cur_argmax,
             cell_output) = \
@@ -387,7 +400,7 @@ class DoppelGANgerGenerator(tf.keras.Model):
                 tf.logical_and(a < time,
                                 tf.equal(tf.reduce_max(e), 1)),
                 compute,
-                (0,
+                (tf.cast(0, dtype=tf.int32),
                     initial_state,
                     feature_input_data if feature_input_data_dim == 2
                     else feature_input_data_reshape[0],
@@ -469,73 +482,73 @@ class DoppelGANgerGenerator(tf.keras.Model):
 ### TESTING ###
 
 
-### TESTING ###
+## TESTING ###
 
 
-# sample_len = 130
-# auto_normalize=True
+sample_len = 130
+auto_normalize=True
 
-# data_feature_outputs = [
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False)
-# ]
+data_feature_outputs = [
+    output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
+    output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
+    output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
+    output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
+    output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False)
+]
 
-# data_attribute_outputs = [
-#     Output(type_=OutputType.DISCRETE, dim=330, is_gen_flag=False)
+data_attribute_outputs = [
+    Output(type_=OutputType.DISCRETE, dim=330, is_gen_flag=False)
 
-# ]
-# num_real_attribute = len(data_attribute_outputs)
-# data_feature, data_attribute, data_gen_flag, min_, max_ = real_data_loading_prism()
-# no, seq_len, dim = data_feature.shape[0], data_feature.shape[1], data_feature.shape[2]
-
-
-
-
-
-
-# if auto_normalize:
-#     (data_feature, data_attribute, data_attribute_outputs,
-#     real_attribute_mask) = \
-#         normalize_per_sample(
-#             data_feature, data_attribute, data_feature_outputs,
-#             data_attribute_outputs)
-# else:
-#     real_attribute_mask = [True] * len(data_attribute_outputs)
+]
+num_real_attribute = len(data_attribute_outputs)
+data_feature, data_attribute, data_gen_flag, min_, max_ = real_data_loading_prism()
+no, seq_len, dim = data_feature.shape[0], data_feature.shape[1], data_feature.shape[2]
 
 
 
 
 
-# data_feature, data_feature_outputs = add_gen_flag(
-#     data_feature, data_gen_flag, data_feature_outputs, sample_len)
+
+if auto_normalize:
+    (data_feature, data_attribute, data_attribute_outputs,
+    real_attribute_mask) = \
+        normalize_per_sample(
+            data_feature, data_attribute, data_feature_outputs,
+            data_attribute_outputs)
+else:
+    real_attribute_mask = [True] * len(data_attribute_outputs)
 
 
-# generator = DoppelGANgerGenerator(
-#         feed_back=False,
-#         noise=True,
-#         feature_outputs=data_feature_outputs,
-#         attribute_outputs=data_attribute_outputs,
-#         real_attribute_mask=real_attribute_mask,
-#         sample_len=sample_len)
 
 
-# g_real_attribute_input_noise_train_pl_l = np.ones((1, 5))
-# g_addi_attribute_input_noise_train_pl_l = np.ones((1, 5)) 
-# g_feature_input_noise_train_pl_l = np.ones((1, 1, 5))
-# g_feature_input_data_train_pl_l = np.ones((1, 910))
 
-# (g_output_feature_train_tf, g_output_attribute_train_tf,
-#              g_output_gen_flag_train_tf, g_output_length_train_tf,
-#              g_output_argmax_train_tf) = \
-#                 generator.build(
-#                     g_real_attribute_input_noise_train_pl_l,
-#                     g_addi_attribute_input_noise_train_pl_l,
-#                     g_feature_input_noise_train_pl_l,
-#                     g_feature_input_data_train_pl_l,
-#                     train=True)
+data_feature, data_feature_outputs = add_gen_flag(
+    data_feature, data_gen_flag, data_feature_outputs, sample_len)
 
-# print("FINISHED")
-# ### END TESTING ###
+
+generator = DoppelGANgerGenerator(
+        feed_back=False,
+        noise=True,
+        feature_outputs=data_feature_outputs,
+        attribute_outputs=data_attribute_outputs,
+        real_attribute_mask=real_attribute_mask,
+        sample_len=sample_len)
+
+
+g_real_attribute_input_noise_train_pl_l = np.ones((3, 5))
+g_addi_attribute_input_noise_train_pl_l = np.ones((3, 5)) 
+g_feature_input_noise_train_pl_l = np.ones((3, 1, 5))
+g_feature_input_data_train_pl_l = np.ones((3, 910))
+
+(g_output_feature_train_tf, g_output_attribute_train_tf,
+             g_output_gen_flag_train_tf, g_output_length_train_tf,
+             g_output_argmax_train_tf) = \
+                generator.build(
+                    g_real_attribute_input_noise_train_pl_l,
+                    g_addi_attribute_input_noise_train_pl_l,
+                    g_feature_input_noise_train_pl_l,
+                    g_feature_input_data_train_pl_l,
+                    train=True)
+
+print("FINISHED")
+### END TESTING ###
