@@ -50,7 +50,7 @@ class DoppelGANger(tf.keras.Model):
         self.attr_d_lr = attr_d_lr
         self.attr_d_beta1 = attr_d_beta1
 
-        #self.check_data()
+        self.check_data()
 
         if self.data_feature.shape[1] % self.seq_len != 0:
             raise Exception("length must be a multiple of sample_len")
@@ -64,35 +64,37 @@ class DoppelGANger(tf.keras.Model):
 
         self.EPS = 1e-8
 
-        def check_data(self):
-            self.gen_flag_dims = []
-
-            dim = 0
-            for output in self.data_feature_outputs:
-                if output.is_gen_flag:
-                    if output.dim != 2:
-                        raise Exception("gen flag output's dim should be 2")
-                    self.gen_flag_dims = [dim, dim + 1]
-                    break
-                dim += output.dim
-            if len(self.gen_flag_dims) == 0:
-                raise Exception("gen flag not found")
-
-            if (self.data_feature.shape[2] != np.sum([t.dim for t in self.data_feature_outputs])):
-                raise Exception(
-                    "feature dimension does not match data_feature_outputs")
-
-            if len(self.data_gen_flag.shape) != 2:
-                raise Exception("data_gen_flag should be 2 dimension")
-
-            self.data_gen_flag = np.expand_dims(self.data_gen_flag, 2)
-        
         #should this be in compile or init?
         # self.g_op = tf.keras.optimizers.Adam(self.g_lr, self.g_beta1)
         # self.d_op = tf.keras.optimizers.Adam(self.d_lr, self.d_beta1)
         # if self.attr_discriminator is not None:
         #     self.attr_d_op = tf.keras.optimizers.Adam(self.attr_d_lr, self.attr_d_beta1)
 
+
+    def check_data(self):
+        self.gen_flag_dims = []
+
+        dim = 0
+        for output in self.data_feature_outputs:
+            if output.is_gen_flag:
+                if output.dim != 2:
+                    raise Exception("gen flag output's dim should be 2")
+                self.gen_flag_dims = [dim, dim + 1]
+                break
+            dim += output.dim
+        if len(self.gen_flag_dims) == 0:
+            raise Exception("gen flag not found")
+
+        if (self.data_feature.shape[2] != np.sum([t.dim for t in self.data_feature_outputs])):
+            raise Exception(
+                "feature dimension does not match data_feature_outputs")
+
+        if len(self.data_gen_flag.shape) != 2:
+            raise Exception("data_gen_flag should be 2 dimension")
+
+        self.data_gen_flag = np.expand_dims(self.data_gen_flag, 2)
+        
+        
     def compile(self):
         super(DoppelGANger, self).compile()
         self.g_op = tf.keras.optimizers.Adam(self.g_lr, self.g_beta1)
@@ -159,6 +161,69 @@ class DoppelGANger(tf.keras.Model):
         #     self.g_output_argmax_train_tf_l.append(g_output_argmax_train_tf)
         # self.g_output_feature_train_tf = tf.concat(self.g_output_feature_train_tf_l, axis=1)
         # self.g_output_attribute_train_tf = tf.concat(self.g_output_attribute_train_tf_l, axis=1)
+
+    def sample_from(self, real_attribute_input_noise, addi_attribute_input_noise, feature_input_noise,
+                    feature_input_data, given_attribute=None, return_gen_flag_feature=False):
+        features = []
+        attributes = []
+        gen_flags = []
+        lengths = []
+        round_ = int(math.ceil(float(feature_input_noise.shape[0]) / self.batch_size))
+        print(round_)
+
+        for i in range(round_):
+            if given_attribute is None:
+                if feature_input_data.ndim == 2:
+                    # (sub_features, sub_attributes, sub_gen_flags, sub_lengths, _) = \
+                    #     self.generator.build(
+                    #         real_attribute_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                    #         addi_attribute_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                    #         feature_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                    #         feature_input_data[i * self.batch_size : (i + 1) * self.batch_size], #dim(None, seq_len*sample_feature_dim)
+                    #         train=False)
+                    
+                    #temporary so that parts below can work
+                    sub_features = np.ones((3, 7, 4)) #not sure if first dim is 3
+                    sub_attributes = np.ones((3,6))
+                    sub_gen_flags = np.ones((3,7,1))
+                    sub_lengths = np.ones((3,))
+
+                else:
+                    (sub_features, sub_attributes, sub_gen_flags, sub_lengths, _) = \
+                        self.generator.build(
+                            real_attribute_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                            addi_attribute_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                            feature_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                            feature_input_data[i * self.batch_size : (i + 1) * self.batch_size], #dim(None, None, seq_len*sample_feature_dim)
+                            train=False)
+            else:
+                (sub_features, sub_attributes, sub_gen_flags, sub_lengths, _) = \
+                    self.generator.build(
+                        None,
+                        addi_attribute_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                        feature_input_noise[i * self.batch_size : (i + 1) * self.batch_size],
+                        feature_input_data[i * self.batch_size : (i + 1) * self.batch_size],
+                        train=False,
+                        attribute=given_attribute[i * self.batch_size : (i + 1) * self.batch_size])
+            
+            features.append(sub_features)
+            attributes.append(sub_attributes)
+            gen_flags.append(sub_gen_flags)
+            lengths.append(sub_lengths)
+        
+        features = np.concatenate(features, axis=0)
+        attributes = np.concatenate(attributes, axis=0)
+        gen_flags = np.concatenate(gen_flags, axis=0)
+        lengths = np.concatenate(lengths, axis=0)
+
+        if not return_gen_flag_feature:
+            features = np.delete(features, self.gen_flag_dims, axis=2)
+
+        assert len(gen_flags.shape) == 3
+        assert gen_flags.shape[2] == 1
+        gen_flags = gen_flags[:, :, 0]
+
+        return features, attributes, gen_flags, lengths 
 
     def gen_loss(self, d_fake_train_tf, attr_d_fake_train_tf):
         #batch_size = tf.shape(self.batch_feature_input_noise[0])[0] #check
@@ -245,18 +310,24 @@ class DoppelGANger(tf.keras.Model):
         with tf.GradientTape() as tape:
 
             #not sure if this should be here or be in build
-            # (g_output_feature_train_tf, g_output_attribute_train_tf, 
-            # g_output_gen_flag_train_tf, g_output_length_train_tf, g_output_argmax_train_tf) = \
-            # self.generator( batch_real_attribute_input_noise,
-            #                         batch_addi_attribute_input_noise,
-            #                         batch_feature_input_noise,
-            #                         batch_feature_input_data)
+            (g_output_feature_train_tf, g_output_attribute_train_tf, 
+            g_output_gen_flag_train_tf, g_output_length_train_tf, g_output_argmax_train_tf) = \
+            self.generator.build( batch_real_attribute_input_noise,
+                                    batch_addi_attribute_input_noise,
+                                    batch_feature_input_noise,
+                                    batch_feature_input_data,
+                                    train=True)
+            
+            # print("goft", g_output_feature_train_tf)
+            # print("goat", g_output_attribute_train_tf)
+            # print("gogft", g_output_gen_flag_train_tf)
+            # print("goltt", g_output_length_train_tf)
             
             #temporary so that parts below can work
-            g_output_feature_train_tf = np.ones((3, 7, 4)) #not sure if first dim is 3
-            g_output_attribute_train_tf = np.ones((3,6))
-            g_output_gen_flag_train_tf = np.ones((3,7,1))
-            g_output_length_train_tf = np.ones((3,))
+            # g_output_feature_train_tf = np.ones((3, 7, 4)) #not sure if first dim is 3
+            # g_output_attribute_train_tf = np.ones((3,6))
+            # g_output_gen_flag_train_tf = np.ones((3,7,1))
+            # g_output_length_train_tf = np.ones((3,))
 
             if self.fix_feature_network:
                 g_output_feature_train_tf = tf.zeros_like(g_output_feature_train_tf)
@@ -334,7 +405,8 @@ class DoppelGANger(tf.keras.Model):
             g_loss = gen_loss(d_fake_train_tf, attr_d_fake_train_tf)
         grads = tape.gradient(g_loss, self.generator.trainable_weights)
         self.g_op.apply_gradients(zip(grads, self.generator.trainable_weights))
-
+    
+    #@tf.function
     def train_step(self, x): #x is here so that i can call fit method
         
         batch_num = self.data_feature.shape[0] // self.batch_size
@@ -355,19 +427,19 @@ class DoppelGANger(tf.keras.Model):
                 batch_feature_input_noise = self.gen_feature_input_noise(self.batch_size, self.sample_time)
                 batch_feature_input_data = self.gen_feature_input_data_free(self.batch_size)
 
-                # print(batch_real_attribute_input_noise.shape)
-                # print(batch_addi_attribute_input_noise.shape)
-                # print(batch_feature_input_noise.shape)
-                # print(batch_feature_input_data.shape)
-                # print("bdf1", batch_data_feature)
-                # print(batch_data_attribute.shape)
+                # print("brait", batch_real_attribute_input_noise.shape) #(?, 5)
+                # print("baain", batch_addi_attribute_input_noise.shape) #(?, 5)
+                # print("bfin", batch_feature_input_noise.shape) #(?,1,5)
+                # print("bfid", batch_feature_input_data.shape) #(?,28)
+                # print("bdf1", batch_data_feature.shape) #(?, 7,4)
+                # print(batch_data_attribute.shape) #(?,6)
     
                 for _ in range(self.d_rounds): #d_rounds-1?
-                    step_d_loss = self.train_step_d(batch_real_attribute_input_noise[i],
-                                                    batch_addi_attribute_input_noise[i],
-                                                    batch_feature_input_noise[i],
-                                                    batch_feature_input_data[i],
-                                                    batch_data_feature, #x (can use x that is passed in here)       #should this be with i?
+                    step_d_loss = self.train_step_d(batch_real_attribute_input_noise, #should this be with i?
+                                                    batch_addi_attribute_input_noise,
+                                                    batch_feature_input_noise,
+                                                    batch_feature_input_data,
+                                                    batch_data_feature, #x (can use x that is passed in here)       
                                                     batch_data_attribute)
                 if self.attr_discriminator is not None:
                     ad_loss = self.train_step_attr_d(batch_real_attribute_input_noise[i],
@@ -394,27 +466,43 @@ from util import *
 seq_len = 7
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data("data")
 
+print("-----DATA LOADING PART-----")
 print(data_feature.shape)
 print(data_attribute.shape)
 print(data_gen_flag.shape)
+num_real_attribute = len(data_attribute_outputs)
 
 (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
     normalize_per_sample(data_feature, data_attribute, data_feature_outputs,data_attribute_outputs)
 
+print("-----DATA NORMALIZATION PART-----")
 print(real_attribute_mask)
 print(data_feature.shape)
 print(data_attribute.shape)
 print(len(data_attribute_outputs))
 
+print("-----ADD GEN FLAG PART -----")
 data_feature, data_feature_outputs = add_gen_flag(
         data_feature, data_gen_flag, data_feature_outputs, seq_len)
 print(data_feature.shape)
 print(len(data_feature_outputs))
 
 from network import discriminator_model, attrdiscriminator_model
+from networkGenerator import DoppelGANgerGenerator
 
 discriminator_model.summary()
 attrdiscriminator_model.summary()
+
+
+
+generator = DoppelGANgerGenerator(
+        feed_back=False,
+        noise=True,
+        feature_outputs=data_feature_outputs,
+        attribute_outputs=data_attribute_outputs,
+        real_attribute_mask=real_attribute_mask,
+        sample_len=seq_len)
+
 
 gan = DoppelGANger(
     epoch=1, 
@@ -426,7 +514,7 @@ gan = DoppelGANger(
     seq_len=seq_len, 
     data_feature_outputs=data_feature_outputs, 
     data_attribute_outputs=data_feature_outputs,
-    generator = None, 
+    generator = generator, 
     discriminator = discriminator_model, 
     d_rounds=1, 
     g_rounds=1, 
@@ -442,7 +530,45 @@ gan.compile()
 
 x = np.ones((500,1))
 
+print("----TRAINING-----")
 gan.fit(x, batch_size=3, epochs=1) #first dim of dummy input x should be the batch size
 #gan.fit(data_feature, batch_size=3, epochs=1)
 #have to pass some actual thing as data, so using data_feature/ x now as placeholder, 
 #also have to actually use the data passed in 
+
+print("----FINISHED TRAINING-----")
+
+print("----START GENERATING------")
+total_generate_num_sample = 500
+
+if data_feature.shape[1] % seq_len != 0:
+    raise Exception("length must be a multiple of sample_len")
+length = int(data_feature.shape[1] / seq_len)
+real_attribute_input_noise = gan.gen_attribute_input_noise(total_generate_num_sample) #(?,5)
+addi_attribute_input_noise = gan.gen_attribute_input_noise(total_generate_num_sample) #(?,5)
+feature_input_noise = gan.gen_feature_input_noise(total_generate_num_sample, length) #(?,1,5)
+input_data = gan.gen_feature_input_data_free(total_generate_num_sample) #(?,28)
+
+features, attributes, gen_flags, lengths = \
+    gan.sample_from(real_attribute_input_noise, addi_attribute_input_noise,feature_input_noise, input_data)
+# specify given_attribute parameter, if you want to generate
+# data according to an attribute
+print("----SAMPLE FROM PART-----")
+print(features.shape)
+print(attributes.shape)
+print(gen_flags.shape)
+print(lengths.shape)
+
+features, attributes = renormalize_per_sample(features, attributes, data_feature_outputs,
+    data_attribute_outputs, gen_flags, num_real_attribute=num_real_attribute)
+print("----RENORMALIZATION PART-----")
+print(features.shape)
+print(attributes.shape)
+
+np.savez(
+        "generated_data_train.npz",
+        data_feature=features,
+        data_attribute=attributes,
+        data_gen_flag=gen_flags)
+
+print("Done")

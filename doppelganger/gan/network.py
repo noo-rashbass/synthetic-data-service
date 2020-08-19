@@ -7,12 +7,25 @@ import numpy as np
 from enum import Enum
 import os
 
-num_layers = 5
+num_layers = 2 #5
 seq_len = 7
-ori_features_dim = 2
-features_dim = 4 #after some magic by utils, dim becomes 4??
-ori_attributes_dim = 2
-attributes_dim = 6 #after some magic by utils, dim becomes 6??
+
+(data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data("data")
+
+ori_features_dim = data_feature.shape[2] #2
+ori_attributes_dim = data_attribute.shape[1] #2
+
+(data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
+    normalize_per_sample(data_feature, data_attribute, data_feature_outputs,data_attribute_outputs)
+
+#check
+attributes_dim = data_attribute.shape[1] #6 #after some magic by utils, dim becomes 6??
+
+data_feature, data_feature_outputs = add_gen_flag(data_feature, data_gen_flag, data_feature_outputs, seq_len)
+
+#check
+features_dim = data_feature.shape[2] #4 #after some magic by utils, dim becomes 4??
+
 total_generate_num_sample = 500
 
 #discriminator
@@ -22,7 +35,7 @@ input_feature_fl_d = tf.keras.layers.Flatten()(input_feature_d)
 input_attribute_fl_d = tf.keras.layers.Flatten()(input_attribute_d)
 output_d = tf.keras.layers.Concatenate(axis=1)([input_feature_fl_d, input_attribute_fl_d])
 for i in range(num_layers - 1):
-    output_ = tf.keras.layers.Dense(200, activation='relu')(output_d)
+    output_d = tf.keras.layers.Dense(200, activation='relu')(output_d)
 output_d = tf.keras.layers.Dense(1)(output_d)
 output_d = tf.squeeze(output_d, axis=1)
 discriminator_model = tf.keras.models.Model(inputs=[input_feature_d, input_attribute_d], outputs=output_d)
@@ -151,25 +164,8 @@ attrdiscriminator_model = tf.keras.models.Model(inputs=input_attribute_ad, outpu
 #                 if output.type_ == OutputType.DISCRETE:
 #                     sub_output = tf.keras.layers.Softmax(sub_output_ori)
 
-(data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data("data")
 
-print(data_feature.shape)
-print(data_attribute.shape)
-print(data_gen_flag.shape)
-
-(data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
-    normalize_per_sample(data_feature, data_attribute, data_feature_outputs,data_attribute_outputs)
-
-print(real_attribute_mask)
-print(data_feature.shape)
-print(data_attribute.shape)
-print(len(data_attribute_outputs))
-
-data_feature, data_feature_outputs = add_gen_flag(
-        data_feature, data_gen_flag, data_feature_outputs, seq_len)
-print(data_feature.shape)
-print(len(data_feature_outputs))
-
+"""
 g_attribute_num_units = 100
 g_attribute_num_layers = 3
 g_feature_num_units = 100
@@ -435,5 +431,6 @@ feature = feature * gen_flag_t
 feature = tf.reshape(feature, [batch_size, time * seq_len, feature_out_dim / seq_len])
 # batch_size * (time * sample_len) * dim
 
-print("f", feature.shape)
-print("gft", gen_flag_t.shape)
+# print("f", feature.shape)
+# print("gft", gen_flag_t.shape)
+"""
