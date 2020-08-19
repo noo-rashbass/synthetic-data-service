@@ -305,14 +305,7 @@ class DoppelGANgerGenerator(tf.keras.Model):
                             gen_flag, all_gen_flag, all_cur_argmax,
                             last_cell_output):
 
-            print(i)
-            print(state.dtype)
-            print(last_output.dtype)
-            print(all_output.dtype)
-            print(gen_flag.dtype)
-            print(all_gen_flag.dtype)
-            print(all_cur_argmax.dtype)
-            print(last_cell_output.dtype)
+           
             
             input_all = [all_discrete_attribute]
             
