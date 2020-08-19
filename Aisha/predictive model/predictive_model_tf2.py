@@ -120,6 +120,7 @@ generated_prediction = loaded_model.predict(generated_in)
 MAE_temp = 0
 no_gen,seq_gen,dim_gen = np.asarray(generated_data).shape
 for i in range(no_gen):
+    #average of the list of MAE is the output
     MAE_temp = MAE_temp + mean_absolute_error(generated_test[i], generated_prediction[i,:,:])
     
 predictive_score = MAE_temp / no
