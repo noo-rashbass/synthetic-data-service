@@ -242,10 +242,15 @@ class DoppelGANgerGenerator(tf.keras.Model):
         # tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.LSTMCell(self.feature_num_units) for _ in range(self.feature_num_layers)]))
         
         # ])
-        
-        rnn_network =  tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.LSTMCell(self.feature_num_units) for _ in range(self.feature_num_layers)]), return_state=True)
+        # rnn_cells = [tf.keras.layers.GRUCell(self.feature_num_units) for _ in range(self.feature_num_layers)]
+        # stacked_lstm = tf.keras.layers.StackedRNNCells(rnn_cells)
+        # rnn_network = tf.keras.layers.RNN(stacked_lstm, return_state=True)
 
-        #rnn_network = tf.compat.v1.nn.rnn_cell.MultiRNNCell([tf.keras.layers.LSTMCell(self.feature_num_units) for _ in range(self.feature_num_layers)])
+        
+        rnn_network = tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(self.feature_num_units) for _ in range(self.feature_num_layers)]), return_state=True)
+        
+        
+        
 
         feature_input_data_dim = \
                 len(tf.convert_to_tensor(feature_input_data).get_shape().as_list())
@@ -265,19 +270,7 @@ class DoppelGANgerGenerator(tf.keras.Model):
             
             _, initial_state = rnn_network(input_)
             
-            # initial_state = tf.random.normal(
-            #     shape=(self.feature_num_layers,
-            #             2,
-            #             batch_size,
-            #             self.feature_num_units),
-            #     mean=0.0, stddev=1.0)
             
-            # initial_state = tf.unstack(initial_state, axis=0)
-            
-            # initial_state = tuple(
-            #     [tf.compat.v1.nn.rnn_cell.LSTMStateTuple(
-            #         initial_state[idx][0], initial_state[idx][1])
-            #         for idx in range(self.feature_num_layers)])
         elif self.initial_state == RNNInitialStateType.VARIABLE: ### this isn't upgraded
             initial_state = []
             for i in range(self.feature_num_layers):
@@ -306,113 +299,106 @@ class DoppelGANgerGenerator(tf.keras.Model):
         
         if time is None:
             time = tf.shape(feature_input_noise)[1]
-        #@tf.function()
-
+        
         #Feeds in the attribute generations into an RNN as well as the previous state to build up a time series
-        def compute(time):
-            i=0
-            state, new_state = initial_state, initial_state
-            all_output = tf.TensorArray(tf.float32, time)
-            gen_flag = tf.ones((batch_size, 1))
-            all_gen_flag = tf.TensorArray(tf.float32, time * self.sample_len)
-            all_cur_argmax = tf.TensorArray(tf.int64, time * self.sample_len)
+        def compute(i, state, last_output, all_output,
+                            gen_flag, all_gen_flag, all_cur_argmax,
+                            last_cell_output):
+            input_all = [all_discrete_attribute]
+            
+            
+            
+            if self.noise:
+                input_all.append(feature_input_noise_reshape[i])
+                
+            if self.feed_back:
+                if feature_input_data_dim == 3:
+                    input_all.append(feature_input_data_reshape[i])
+                else:
+                    input_all.append(last_output)
+            
+            input_all = tf.concat(input_all, axis=1)
             
 
-            if feature_input_data_dim == 2:
-                last_output =  feature_input_data
-            else:
-                last_output = feature_input_data_reshape[0]
             
-            while i < time and tf.equal(tf.reduce_max(gen_flag), 1):
-
+            input_all = tf.expand_dims(input_all, axis=2)
+          
             
-                input_all = [all_discrete_attribute]
-                
-                
-                
-                if self.noise:
-                    input_all.append(feature_input_noise_reshape[i])
-                    
-                if self.feed_back:
-                    if feature_input_data_dim == 3:
-                        input_all.append(feature_input_data_reshape[i])
-                    else:
-                        input_all.append(last_output)
-                input_all = tf.concat(input_all, axis=1)
-                
-                input_all = tf.expand_dims(input_all, axis=2)
-                
-                
-                
-                rnn_network =  tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.LSTMCell(self.feature_num_units) for _ in range(self.feature_num_layers)]), return_state=True)          
-                
-                
-                
-                cell_new_output, new_state = rnn_network(input_all)#, initial_state=state)
-                
-                
-                new_output_all = []
-                id_ = 0
-
-                for j in range(self.sample_len):
-                    for k in range(len(self.feature_outputs)):
-                        output = self.feature_outputs[k]
-                        sub_output = tf.keras.layers.Dense(output.dim)(cell_new_output)
-                        if (output.type_ == OutputType.DISCRETE):
-                            sub_output = tf.nn.softmax(sub_output)
-                        elif (output.type_ == OutputType.CONTINUOUS):
-                            if (output.normalization ==
-                                    Normalization.ZERO_ONE):
-                                sub_output = tf.nn.sigmoid(sub_output)
-                            elif (output.normalization ==
-                                    Normalization.MINUSONE_ONE):
-                                sub_output = tf.nn.tanh(sub_output)
-                            else:
-                                raise Exception("unknown normalization"
-                                                " type")
+            cell_new_output, new_state = rnn_network(input_all, initial_state=state)
+            
+            new_output_all = []
+            id_ = 0
+            for j in range(self.sample_len):
+                for k in range(len(self.feature_outputs)):
+                    output = self.feature_outputs[k]
+                    sub_output = tf.keras.layers.Dense(output.dim)(cell_new_output)
+                    if (output.type_ == OutputType.DISCRETE):
+                        sub_output = tf.nn.softmax(sub_output)
+                    elif (output.type_ == OutputType.CONTINUOUS):
+                        if (output.normalization ==
+                                Normalization.ZERO_ONE):
+                            sub_output = tf.nn.sigmoid(sub_output)
+                        elif (output.normalization ==
+                                Normalization.MINUSONE_ONE):
+                            sub_output = tf.nn.tanh(sub_output)
                         else:
-                            raise Exception("unknown output type")
-                        new_output_all.append(sub_output)
-                        id_ += 1
-                new_output = tf.concat(new_output_all, axis=1)
-                
-                for j in range(self.sample_len):
-                    all_gen_flag = all_gen_flag.write(
-                        i * self.sample_len + j, gen_flag)
-                    cur_gen_flag = tf.cast(tf.equal(tf.argmax(
+                            raise Exception("unknown normalization"
+                                            " type")
+                    else:
+                        raise Exception("unknown output type")
+                    new_output_all.append(sub_output)
+                    id_ += 1
+            new_output = tf.concat(new_output_all, axis=1)
+            
+            for j in range(self.sample_len):
+                all_gen_flag = all_gen_flag.write(
+                    i * self.sample_len + j, gen_flag)
+                cur_gen_flag = tf.cast(tf.equal(tf.argmax(
+                    new_output_all[(j * len(self.feature_outputs) +
+                                    self.gen_flag_id)],
+                    axis=1), 0), dtype=tf.float32) 
+                cur_gen_flag = tf.reshape(cur_gen_flag, [-1, 1])
+                all_cur_argmax = all_cur_argmax.write(
+                    i * self.sample_len + j,
+                    tf.argmax(
                         new_output_all[(j * len(self.feature_outputs) +
                                         self.gen_flag_id)],
-                        axis=1), 0), dtype=tf.float32) 
-                    cur_gen_flag = tf.reshape(cur_gen_flag, [-1, 1])
-                    all_cur_argmax = all_cur_argmax.write(
-                        i * self.sample_len + j,
-                        tf.argmax(
-                            new_output_all[(j * len(self.feature_outputs) +
-                                            self.gen_flag_id)],
-                            axis=1))
-                    
-                    
-                    
-                    
-                    gen_flag = gen_flag * cur_gen_flag
-                    
+                        axis=1))
                 
-                state = new_state
-                last_output = new_output
-                all_output = all_output.write(i, tf.cast(new_output, dtype=tf.float32))
-                last_cell_output = cell_new_output
-                i+=1
+                
+                
+                
+                gen_flag = gen_flag * cur_gen_flag
+
+                
             return (i + 1,
-                        new_state,
-                        new_output,
-                        all_output.write(i-1, tf.cast(new_output, dtype=tf.float32)),
-                        gen_flag,
-                        all_gen_flag,
-                        all_cur_argmax,
-                        cell_new_output)
-        
+                    new_state,
+                    new_output,
+                    all_output.write(i, tf.cast(new_output, dtype=tf.float32)),
+                    gen_flag,
+                    all_gen_flag,
+                    all_cur_argmax,
+                    cell_new_output) 
+
         (i, state, _, feature, _, gen_flag, cur_argmax,
-                cell_output) = compute(time)
+            cell_output) = \
+            tf.while_loop(
+                lambda a, b, c, d, e, f, g, h:
+                tf.logical_and(a < time,
+                                tf.equal(tf.reduce_max(e), 1)),
+                compute,
+                (0,
+                    initial_state,
+                    feature_input_data if feature_input_data_dim == 2
+                    else feature_input_data_reshape[0],
+                    tf.TensorArray(tf.float32, time),
+                    tf.ones((batch_size, 1)),
+                    tf.TensorArray(tf.float32, time * self.sample_len),
+                    tf.TensorArray(tf.int64, time * self.sample_len),
+                    tf.zeros((batch_size, self.feature_num_units))))
+
+        
+       
         
         def fill_rest(i, all_output, all_gen_flag, all_cur_argmax):
                 all_output = all_output.write(
