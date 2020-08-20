@@ -407,8 +407,8 @@ class DoppelGANger(tf.keras.Model):
             d_fake_train_tf = self.discriminator([g_output_feature_train_tf, g_output_attribute_train_tf])
             attr_d_fake_train_tf = self.attr_discriminator(g_output_attribute_train_tf)
             g_loss = self.gen_loss(d_fake_train_tf, attr_d_fake_train_tf)
-        grads = tape.gradient(g_loss, self.generator.trainable_weights)
-        self.g_op.apply_gradients(zip(grads, self.generator.trainable_weights))
+        grads = tape.gradient(g_loss, self.generator.trainable_w) #self.generator.trainable_weights)
+        self.g_op.apply_gradients(zip(grads, self.generator.trainable_w)) #self.generator.trainable_weights))
     
     #@tf.function
     def train_step(self, x): #x is here so that i can call fit method
@@ -516,7 +516,7 @@ generator = DoppelGANgerGenerator(
 
 gan = DoppelGANger(
     epoch=1, 
-    batch_size=3, 
+    batch_size=50, 
     data_feature=data_feature, 
     data_attribute=data_attribute, 
     real_attribute_mask=real_attribute_mask, 
@@ -541,7 +541,7 @@ gan.compile()
 x = np.ones((500,1))
 
 print("----TRAINING-----")
-gan.fit(x, batch_size=3, epochs=1) #first dim of dummy input x should be the batch size
+gan.fit(x, batch_size=50, epochs=1) #first dim of dummy input x should be the batch size
 #gan.fit(data_feature, batch_size=3, epochs=1)
 #have to pass some actual thing as data, so using data_feature/ x now as placeholder, 
 #also have to actually use the data passed in 
