@@ -29,11 +29,13 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
         self.feature_outputs = feature_outputs
         self.sample_len = sample_len
         self.feature_num_layers = feature_num_layers
-        self. feature_num_units =  feature_num_units
+        self.feature_num_units =  feature_num_units
         self.initial_state = initial_state            
         
         self.noise = noise
 
+        self.feature_out_dim = (np.sum([t.dim for t in feature_outputs]) *
+                                self.sample_len)
     
         self.outputs ={}
         for output in self.feature_outputs:
@@ -74,8 +76,8 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
 
         initial_all_output = tf.TensorArray(tf.float32, time)
         initial_gen_flag = tf.ones((batch_size, 1))
-        initial_all_gen_flag = tf.TensorArray(tf.float32, time * sample_len)
-        initial_all_cur_argmax = tf.TensorArray(tf.int64, time * sample_len)
+        initial_all_gen_flag = tf.TensorArray(tf.float32, time * self.sample_len)
+        initial_all_cur_argmax = tf.TensorArray(tf.int64, time * self.sample_len)
         initial_last_cell_output = tf.zeros((batch_size, self.feature_num_units))
         if feature_input_data_dim == 2:
             initial_last_output=feature_input_data 
@@ -86,11 +88,11 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
 
         
         if self.initial_state == RNNInitialStateType.ZERO:
-            self.initial_state = rnn_network.zero_state(
+            initial_state_ = rnn_network.zero_state(
                 batch_size, tf.float32)
         elif self.initial_state == RNNInitialStateType.RANDOM:
             input_ = tf.random.normal([batch_size, self.feature_num_units, 1]) ### Not sure if i got this right
-            _, self.initial_state = self.rnn_network(input_)
+            _, initial_state_ = self.rnn_network(input_)
         else:
             raise NotImplementedError
 
@@ -100,11 +102,11 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
 
            
             
-            input_all = [all_discrete_attribute]
+            input_all = [tf.cast(all_discrete_attribute, dtype=tf.float32)]
             
             
             if self.noise:
-                input_all.append(feature_input_noise_reshape[i])
+                input_all.append(tf.cast(feature_input_noise_reshape[i], dtype=tf.float32))
                 
             input_all = tf.concat(input_all, axis=1)
 
@@ -175,7 +177,7 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
                                 tf.equal(tf.reduce_max(e), 1)),
                 compute,
                 (tf.cast(0, dtype=tf.int32),
-                    self.initial_state,
+                    initial_state_,
                     initial_last_output,
                     initial_all_output, 
                     initial_gen_flag, 
@@ -347,8 +349,7 @@ class DoppelGANgerGeneratorMLP(tf.keras.layers.Layer):
                 try:
                     x = layer[0](x)#1st
                     x = layer[1](x, training = training)
-                except UnboundLocalError as e:
-                    print(layers[-1])
+                except Exception as e:
                     x = self.initial_layers[part_i](layers[-1])
                     x = layer[0](x)# 2nd
                     x = layer[1](x)
