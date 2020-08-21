@@ -11,7 +11,7 @@ import os
 import sys
 import output
 sys.modules["output"] = output
-#from data_loading import sine_data_generation_f_a, real_data_loading_prism, renormalize
+from data_loading import sine_data_generation_f_a, real_data_loading_prism, renormalize
 #tf.keras.backend.set_floatx('float32')
 
 class RNNInitialStateType(Enum):
@@ -19,6 +19,407 @@ class RNNInitialStateType(Enum):
     RANDOM = "RANDOM"
     VARIABLE = "VARIABLE"
 
+class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
+    def __init__(self, feature_outputs, sample_len, noise,
+                feature_num_layers=1, feature_num_units=100, 
+                initial_state=RNNInitialStateType.RANDOM,*args, **kwargs):
+        super(DoppelGANgerGeneratorRNN, self).__init__(*args, **kwargs)
+        
+        
+        self.feature_outputs = feature_outputs
+        self.sample_len = sample_len
+        self.feature_num_layers = feature_num_layers
+        self. feature_num_units =  feature_num_units
+        self.initial_state = initial_state            
+        
+        self.noise = noise
+
+    
+        self.outputs ={}
+        for output in self.feature_outputs:
+            self.outputs[str(output.dim)] = tf.keras.layers.Dense(output.dim)
+        
+        self.gen_flag_id = None
+        for i in range(len(self.feature_outputs)):
+            if self.feature_outputs[i].is_gen_flag:
+                self.gen_flag_id = i
+                break
+        if self.gen_flag_id is None:
+            raise Exception("cannot find gen_flag_id")
+        if self.feature_outputs[self.gen_flag_id].dim != 2:
+            raise Exception("gen flag output's dim should be 2")
+        
+        self.rnn_network = tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(self.feature_num_units) for _ in range(self.feature_num_layers)]), return_state=True)
+
+
+        
+
+    def call(self, all_discrete_attribute, feature_input_noise, feature_input_data):
+
+        feature_input_data = feature_input_data
+        feature_input_data_dim = \
+                    len(tf.convert_to_tensor(feature_input_data).get_shape().as_list())
+        if feature_input_data_dim == 3:
+            feature_input_data_reshape = tf.transpose(
+                       feature_input_data, [1, 0, 2])
+
+        feature_input_noise_reshape = tf.transpose(
+            feature_input_noise, [1, 0, 2])
+
+        time = tf.convert_to_tensor(feature_input_noise).get_shape().as_list()[1]
+        
+        if time is None:
+            time = tf.shape(feature_input_noise)[1]        
+        batch_size = tf.shape(feature_input_noise)[0]
+
+        initial_all_output = tf.TensorArray(tf.float32, time)
+        initial_gen_flag = tf.ones((batch_size, 1))
+        initial_all_gen_flag = tf.TensorArray(tf.float32, time * sample_len)
+        initial_all_cur_argmax = tf.TensorArray(tf.int64, time * sample_len)
+        initial_last_cell_output = tf.zeros((batch_size, self.feature_num_units))
+        if feature_input_data_dim == 2:
+            initial_last_output=feature_input_data 
+            
+        else:
+            initial_last_output = feature_input_data_reshape[0]
+
+
+        
+        if self.initial_state == RNNInitialStateType.ZERO:
+            self.initial_state = rnn_network.zero_state(
+                batch_size, tf.float32)
+        elif self.initial_state == RNNInitialStateType.RANDOM:
+            input_ = tf.random.normal([batch_size, self.feature_num_units, 1]) ### Not sure if i got this right
+            _, self.initial_state = self.rnn_network(input_)
+        else:
+            raise NotImplementedError
+
+        def compute(i, state, last_output, all_output,
+                            gen_flag, all_gen_flag, all_cur_argmax,
+                            last_cell_output):
+
+           
+            
+            input_all = [all_discrete_attribute]
+            
+            
+            if self.noise:
+                input_all.append(feature_input_noise_reshape[i])
+                
+            input_all = tf.concat(input_all, axis=1)
+
+            input_all = tf.expand_dims(input_all, axis=2)
+
+            cell_new_output, new_state = self.rnn_network(input_all, initial_state=state)
+
+
+            new_output_all = []
+            id_ = 0
+            for j in range(self.sample_len):
+                for k in range(len(self.feature_outputs)):
+                    output = self.feature_outputs[k]
+                    sub_output = self.outputs[str(output.dim)](cell_new_output)
+                    if (output.type_ == OutputType.DISCRETE):
+                        sub_output = tf.nn.softmax(sub_output)
+                    elif (output.type_ == OutputType.CONTINUOUS):
+                        if (output.normalization ==
+                                Normalization.ZERO_ONE):
+                            sub_output = tf.nn.sigmoid(sub_output)
+                        elif (output.normalization ==
+                                Normalization.MINUSONE_ONE):
+                            sub_output = tf.nn.tanh(sub_output)
+                        else:
+                            raise Exception("unknown normalization"
+                                            " type")
+                    else:
+                        raise Exception("unknown output type")
+                    new_output_all.append(sub_output)
+                    id_ += 1
+            new_output = tf.concat(new_output_all, axis=1)
+            
+            for j in range(self.sample_len):
+                all_gen_flag = all_gen_flag.write(
+                    i * self.sample_len + j, gen_flag)
+                cur_gen_flag = tf.cast(tf.equal(tf.argmax(
+                    new_output_all[(j * len(self.feature_outputs) +
+                                    self.gen_flag_id)],
+                    axis=1), 0), dtype=tf.float32) 
+                cur_gen_flag = tf.reshape(cur_gen_flag, [-1, 1])
+                all_cur_argmax = all_cur_argmax.write(
+                    i * self.sample_len + j,
+                    tf.argmax(
+                        new_output_all[(j * len(self.feature_outputs) +
+                                        self.gen_flag_id)],
+                        axis=1))
+                
+                
+                
+                
+                gen_flag = gen_flag * cur_gen_flag
+
+                
+            return (i + 1, 
+                    new_state,
+                    new_output, 
+                    all_output.write(i, new_output),
+                    gen_flag,
+                    all_gen_flag,
+                    all_cur_argmax,
+                    cell_new_output) 
+
+        (i, state, _, feature, _, gen_flag, cur_argmax,
+            cell_output) = \
+            tf.while_loop(
+                lambda a, b, c, d, e, f, g, h:
+                tf.logical_and(a < time,
+                                tf.equal(tf.reduce_max(e), 1)),
+                compute,
+                (tf.cast(0, dtype=tf.int32),
+                    self.initial_state,
+                    initial_last_output,
+                    initial_all_output, 
+                    initial_gen_flag, 
+                    initial_all_gen_flag, 
+                    initial_all_cur_argmax, 
+                    initial_last_cell_output))
+
+        
+        
+       
+        
+        def fill_rest(i, all_output, all_gen_flag, all_cur_argmax):
+                all_output = all_output.write(
+                    i, tf.zeros((batch_size, self.feature_out_dim)))
+                
+                for j in range(self.sample_len):
+                    all_gen_flag = all_gen_flag.write(
+                        i * self.sample_len + j,
+                        tf.zeros((batch_size, 1)))
+                    all_cur_argmax = all_cur_argmax.write(
+                        i * self.sample_len + j,
+                        tf.zeros((batch_size,), dtype=tf.int64))
+                
+                return (i + 1,
+                        all_output,
+                        all_gen_flag,
+                        all_cur_argmax)
+        
+        _, feature, gen_flag, cur_argmax = tf.while_loop(
+                lambda a, b, c, d: a < time,
+                fill_rest,
+                (i, feature, gen_flag, cur_argmax))
+        
+        return feature, gen_flag, cur_argmax
+        
+        
+
+class DoppelGANgerGeneratorMLP(tf.keras.layers.Layer):
+    def __init__(self, addi_attribute_outputs, real_attribute_outputs,
+                real_attribute_out_dim, addi_attribute_out_dim, real_attribute_mask,
+                attribute_outputs,
+                attribute=None, attribute_num_units=100, attribute_num_layers=3,
+                *args, **kwargs):
+        super(DoppelGANgerGeneratorMLP, self).__init__(*args, **kwargs)
+        
+        self.attribute = attribute
+        self.__dict__['real_attribute_outputs'] = real_attribute_outputs
+        self.__dict__['addi_attribute_outputs'] = addi_attribute_outputs
+        
+        self.real_attribute_out_dim = real_attribute_out_dim
+        self.addi_attribute_out_dim = addi_attribute_out_dim
+        self.real_attribute_mask = real_attribute_mask
+        self.real_attribute_outputs = real_attribute_outputs
+        self.attribute_outputs = attribute_outputs
+        self.attribute_out_dim = np.sum([t.dim for t in attribute_outputs])
+        if attribute is None:
+            if len(self.addi_attribute_outputs) > 0:
+                self.__dict__['all_attribute_outputs'] = \
+                    [self.real_attribute_outputs,
+                        self.addi_attribute_outputs]
+            else:
+                self.__dict__['all_attribute_outputs'] = [self.real_attribute_outputs]
+        else:
+            if len(self.addi_attribute_outputs) > 0:
+                self.__dict__['all_attribute_outputs'] = \
+                    [self.addi_attribute_outputs]
+            else:
+                self.__dict__['all_attribute_outputs'] = []
+ 
+        self.attribute_num_units = attribute_num_units
+        self.attribute_num_layers = attribute_num_layers
+        self.layers_ = [[tf.keras.layers.Dense(self.attribute_num_units, activation='relu'), tf.keras.layers.BatchNormalization(momentum=0.9,
+                                        epsilon=1e-5,
+                                        scale=True,
+                                        trainable=True)] for _ in range(self.attribute_num_layers -1)]
+        
+        self.initial_layers=[tf.keras.layers.Dense(self.attribute_num_units, activation='relu'), tf.keras.layers.Dense(self.attribute_num_units, activation='relu')]
+        self.outputs={}
+        for real_fake in self.__dict__['all_attribute_outputs']:
+            for output in real_fake:
+                self.outputs[str(output.dim)] = tf.keras.layers.Dense(output.dim)
+        
+
+        self.real_attribute_outputs = []
+        self.addi_attribute_outputs = []
+        self.real_attribute_out_dim = 0
+        self.addi_attribute_out_dim = 0
+        for i in range(len(self.real_attribute_mask)):
+            if self.real_attribute_mask[i]:
+                self.real_attribute_outputs.append(
+                    self.attribute_outputs[i])
+                self.real_attribute_out_dim += self.attribute_outputs[i].dim
+            else:
+                self.addi_attribute_outputs.append(
+                    self.attribute_outputs[i])
+                self.addi_attribute_out_dim += \
+                    self.attribute_outputs[i].dim
+
+        for i in range(len(self.real_attribute_mask) - 1):
+            if (self.real_attribute_mask[i] == False and
+                    self.real_attribute_mask[i + 1] == True):
+                raise Exception("Real attribute should come first")
+
+
+        self.STR_REAL = "real"
+        self.STR_ADDI = "addi"
+
+    
+    def call(self, attribute_input_noise, feature_input_noise, 
+            addi_attribute_input_noise, training=None, attribute=None):
+        batch_size = tf.shape(feature_input_noise)[0]
+        
+        #Prepare attribute variable names
+        if attribute is None: #No respective attribute
+            all_attribute = []
+            all_discrete_attribute = []
+            if len(self.addi_attribute_outputs) > 0:
+                all_attribute_input_noise = \
+                    [attribute_input_noise,
+                        addi_attribute_input_noise]
+                all_attribute_outputs = \
+                    [self.real_attribute_outputs,
+                        self.addi_attribute_outputs]
+                all_attribute_part_name = \
+                    [self.STR_REAL, self.STR_ADDI]
+                all_attribute_out_dim = \
+                    [self.real_attribute_out_dim,
+                        self.addi_attribute_out_dim]
+            else:
+                all_attribute_input_noise = [attribute_input_noise]
+                all_attribute_outputs = [self.real_attribute_outputs]
+                all_attribute_part_name = [self.STR_REAL]
+                all_attribute_out_dim = [self.real_attribute_out_dim]
+            
+
+        else: # generate with respect to attribute.
+            all_attribute = [attribute]
+            all_discrete_attribute = [attribute]
+            if len(self.addi_attribute_outputs) > 0:
+                all_attribute_input_noise = \
+                    [addi_attribute_input_noise]
+                all_attribute_outputs = \
+                    [self.addi_attribute_outputs]
+                all_attribute_part_name = \
+                    [self.STR_ADDI]
+                all_attribute_out_dim = [self.addi_attribute_out_dim]
+            else:
+                all_attribute_input_noise = []
+                all_attribute_outputs = []
+                all_attribute_part_name = []
+                all_attribute_out_dim = []
+        
+        for part_i in range(len(all_attribute_input_noise)):
+            
+            #Only used if there's a respective attribute I think.
+            if len(all_discrete_attribute) > 0:
+                layers = [tf.concat(
+                    [all_attribute_input_noise[part_i]] +
+                    all_discrete_attribute,
+                    axis=1)]
+            #Layers is either additional or real    
+            else:
+                layers = [all_attribute_input_noise[part_i]]
+            
+            #build a feedforward network output FUNCTIONAL API
+            
+            
+            for layer in self.layers_:
+                try:
+                    x = layer[0](x)#1st
+                    x = layer[1](x, training = training)
+                except UnboundLocalError as e:
+                    print(layers[-1])
+                    x = self.initial_layers[part_i](layers[-1])
+                    x = layer[0](x)# 2nd
+                    x = layer[1](x)
+                    
+            
+            part_attribute = []
+            part_discrete_attribute = []
+            #for each of the attribute outputs feed the noise through the MLP.
+            for i in range(len(all_attribute_outputs[part_i])):
+                output = all_attribute_outputs[part_i][i]              
+               
+                
+                sub_output_ori = self.outputs[str(output.dim)](x) ##Not 100% sure this is doing the right thing
+                
+                if (output.type_ == OutputType.DISCRETE):
+                    sub_output = tf.nn.softmax(sub_output_ori)
+                    sub_output_discrete = tf.one_hot(
+                        tf.argmax(sub_output, axis=1),
+                        output.dim)
+                elif (output.type_ == OutputType.CONTINUOUS):
+                    if (output.normalization ==
+                            Normalization.ZERO_ONE):
+                        sub_output = tf.nn.sigmoid(
+                            sub_output_ori)
+                    elif (output.normalization ==
+                            Normalization.MINUSONE_ONE):
+                        sub_output = tf.nn.tanh(sub_output_ori)
+                    else:
+                        raise Exception("unknown normalization"
+                                        " type")
+                    sub_output_discrete = sub_output
+                else:
+                    raise Exception("unknown output type")
+                
+                part_attribute.append(sub_output)
+                part_discrete_attribute.append(
+                    sub_output_discrete)
+            
+
+            part_attribute = tf.concat(part_attribute, axis=1)
+            part_discrete_attribute = tf.concat(
+                part_discrete_attribute, axis=1)
+            part_attribute = tf.reshape(
+                part_attribute,
+                [batch_size, all_attribute_out_dim[part_i]])
+
+            
+            part_discrete_attribute = tf.reshape(
+                part_discrete_attribute,
+                [batch_size, all_attribute_out_dim[part_i]])
+            
+            # batch_size * dim
+        
+            part_discrete_attribute = tf.dtypes.cast(tf.stop_gradient(
+                part_discrete_attribute), tf.float64)
+
+            all_attribute.append(part_attribute)
+            all_discrete_attribute.append(part_discrete_attribute)
+            del x
+
+        all_attribute = tf.concat(all_attribute, axis=1)
+    
+        all_discrete_attribute = tf.concat(all_discrete_attribute, axis=1)
+        all_attribute = tf.reshape(
+            all_attribute,
+            [batch_size, self.attribute_out_dim])
+        all_discrete_attribute = tf.reshape(
+            all_discrete_attribute,
+            [batch_size, self.attribute_out_dim])
+
+        return all_attribute, all_discrete_attribute  
 
 class DoppelGANgerGenerator(tf.keras.Model):
     def __init__(self, feed_back, noise,
@@ -78,359 +479,32 @@ class DoppelGANgerGenerator(tf.keras.Model):
         if self.feature_outputs[self.gen_flag_id].dim != 2:
             raise Exception("gen flag output's dim should be 2")
 
-        self.STR_REAL = "real"
-        self.STR_ADDI = "addi"
+        
+        
 
-    def build(self, attribute_input_noise, addi_attribute_input_noise,    #def call()? 
+        self.rnn = DoppelGANgerGeneratorRNN(self.feature_outputs, self.sample_len, True)
+        self.MLP = DoppelGANgerGeneratorMLP(self.addi_attribute_outputs, self.real_attribute_outputs,
+                                            self.real_attribute_out_dim, self.addi_attribute_out_dim,
+                                            self.real_attribute_mask, self.attribute_outputs)
+
+    def call(self, attribute_input_noise, addi_attribute_input_noise,    #def call()? 
             feature_input_noise, feature_input_data, train,
             attribute=None):
         
-        batch_size = tf.shape(feature_input_noise)[0]
-        
-        #Prepare attribute variable names
-        if attribute is None: #No respective attribute
-            all_attribute = []
-            all_discrete_attribute = []
-            if len(self.addi_attribute_outputs) > 0:
-                all_attribute_input_noise = \
-                    [attribute_input_noise,
-                        addi_attribute_input_noise]
-                all_attribute_outputs = \
-                    [self.real_attribute_outputs,
-                        self.addi_attribute_outputs]
-                all_attribute_part_name = \
-                    [self.STR_REAL, self.STR_ADDI]
-                all_attribute_out_dim = \
-                    [self.real_attribute_out_dim,
-                        self.addi_attribute_out_dim]
-            else:
-                all_attribute_input_noise = [attribute_input_noise]
-                all_attribute_outputs = [self.real_attribute_outputs]
-                all_attribute_part_name = [self.STR_REAL]
-                all_attribute_out_dim = [self.real_attribute_out_dim]
-            
-
-        else: # generate with respect to attribute.
-            all_attribute = [attribute]
-            all_discrete_attribute = [attribute]
-            if len(self.addi_attribute_outputs) > 0:
-                all_attribute_input_noise = \
-                    [addi_attribute_input_noise]
-                all_attribute_outputs = \
-                    [self.addi_attribute_outputs]
-                all_attribute_part_name = \
-                    [self.STR_ADDI]
-                all_attribute_out_dim = [self.addi_attribute_out_dim]
-            else:
-                all_attribute_input_noise = []
-                all_attribute_outputs = []
-                all_attribute_part_name = []
-                all_attribute_out_dim = []
-        
-        #for both the additional and real attributes:
-        for part_i in range(len(all_attribute_input_noise)):
-            
-            #Only used if there's a respective attribute I think.
-            if len(all_discrete_attribute) > 0:
-                layers = [tf.concat(
-                    [all_attribute_input_noise[part_i]] +
-                    all_discrete_attribute,
-                    axis=1)]
-            #Layers is either additional or real    
-            else:
-                layers = [all_attribute_input_noise[part_i]]
-            
-            #build a feedforward network output FUNCTIONAL API
-            
-            inputs = tf.keras.Input(shape=layers[-1].shape[-1]) # added [-1] as a hacky fix, the shape wasn't working properly ?? 
-            x = tf.keras.layers.Dense(self.attribute_num_units, activation='relu')(inputs)
-            x = tf.keras.layers.BatchNormalization(momentum=0.9,
-                                            epsilon=1e-5,
-                                            scale=True,
-                                            trainable=True)(x)
-            for _ in range(self.attribute_num_layers-2):
-                x = tf.keras.layers.Dense(self.attribute_num_units, activation='relu')(x)
-                x = tf.keras.layers.BatchNormalization(momentum=0.9,
-                                            epsilon=1e-5,
-                                            scale=True,
-                                            trainable=True)(x)
-
                 
-            
-             #SEQUENTIAL API
-            # model = tf.keras.Sequential()
-            # for i in range(self.attribute_num_layers - 1):
-            #     model.add(tf.keras.layers.Dense(self.attribute_num_units)),
-            #     model.add(tf.keras.layers.ReLU()),
-            #     model.add(tf.keras.layers.BatchNormalization(momentum=0.9,
-            #                                 epsilon=1e-5,
-            #                                 scale=True,
-            #                                 trainable=True))
-            
-
-           
-            part_attribute = []
-            part_discrete_attribute = []
-            #for each of the attribute outputs feed the noise through the MLP.
-            for i in range(len(all_attribute_outputs[part_i])):
-                output = all_attribute_outputs[part_i][i]
-                
-                outputs = tf.keras.layers.Dense(output.dim)(x)
-                model = tf.keras.Model(inputs, outputs, name="nn")
-               
-                
-                sub_output_ori = model(layers[-1]) ##Not 100% sure this is doing the right thing
-                
-                if (output.type_ == OutputType.DISCRETE):
-                    sub_output = tf.nn.softmax(sub_output_ori)
-                    sub_output_discrete = tf.one_hot(
-                        tf.argmax(sub_output, axis=1),
-                        output.dim)
-                elif (output.type_ == OutputType.CONTINUOUS):
-                    if (output.normalization ==
-                            Normalization.ZERO_ONE):
-                        sub_output = tf.nn.sigmoid(
-                            sub_output_ori)
-                    elif (output.normalization ==
-                            Normalization.MINUSONE_ONE):
-                        sub_output = tf.nn.tanh(sub_output_ori)
-                    else:
-                        raise Exception("unknown normalization"
-                                        " type")
-                    sub_output_discrete = sub_output
-                else:
-                    raise Exception("unknown output type")
-                
-                part_attribute.append(sub_output)
-                part_discrete_attribute.append(
-                    sub_output_discrete)
-            
-
-            part_attribute = tf.concat(part_attribute, axis=1)
-            part_discrete_attribute = tf.concat(
-                part_discrete_attribute, axis=1)
-            part_attribute = tf.reshape(
-                part_attribute,
-                [batch_size, all_attribute_out_dim[part_i]])
-
-            
-            part_discrete_attribute = tf.reshape(
-                part_discrete_attribute,
-                [batch_size, all_attribute_out_dim[part_i]])
-            
-            # batch_size * dim
-        
-            part_discrete_attribute = tf.dtypes.cast(tf.stop_gradient(
-                part_discrete_attribute), tf.float64)
-
-            all_attribute.append(part_attribute)
-            all_discrete_attribute.append(part_discrete_attribute)
-
-
-        all_attribute = tf.concat(all_attribute, axis=1)
-    
-        all_discrete_attribute = tf.concat(all_discrete_attribute, axis=1)
-        all_attribute = tf.reshape(
-            all_attribute,
-            [batch_size, self.attribute_out_dim])
-        all_discrete_attribute = tf.reshape(
-            all_discrete_attribute,
-            [batch_size, self.attribute_out_dim])
-        
-        # rnn_network = tf.keras.Sequential([
-        
-        # tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.LSTMCell(self.feature_num_units) for _ in range(self.feature_num_layers)]))
-        
-        # ])
-        # rnn_cells = [tf.keras.layers.GRUCell(self.feature_num_units) for _ in range(self.feature_num_layers)]
-        # stacked_lstm = tf.keras.layers.StackedRNNCells(rnn_cells)
-        # rnn_network = tf.keras.layers.RNN(stacked_lstm, return_state=True)
-
-        
-        rnn_network = tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(self.feature_num_units) for _ in range(self.feature_num_layers)]), return_state=True)
+        all_attribute, all_discrete_attribute = self.MLP(attribute_input_noise, feature_input_noise, 
+                                                        addi_attribute_input_noise)
         
         
-        
-
-        feature_input_data_dim = \
-                len(tf.convert_to_tensor(feature_input_data).get_shape().as_list())
-        if feature_input_data_dim == 3:
-            feature_input_data_reshape = tf.transpose(
-                feature_input_data, [1, 0, 2])
-        feature_input_noise_reshape = tf.transpose(
-            feature_input_noise, [1, 0, 2])
-
-
-        if self.initial_state == RNNInitialStateType.ZERO:
-            initial_state = rnn_network.zero_state(
-                batch_size, tf.float64)
-        elif self.initial_state == RNNInitialStateType.RANDOM:
-            
-            input_ = tf.random.normal([batch_size, self.attribute_num_units, 1]) ### Not sure if i got this right
-            
-            _, initial_state = rnn_network(input_)
-            
-            
-        elif self.initial_state == RNNInitialStateType.VARIABLE: ### this isn't upgraded
-            initial_state = []
-            for i in range(self.feature_num_layers):
-                sub_initial_state1 = tf.get_variable(
-                    "layer{}_initial_state1".format(i),
-                    (1, self.feature_num_units),
-                    initializer=tf.random_normal_initializer(
-                        stddev=self.initial_stddev))
-                sub_initial_state1 = tf.tile(
-                    sub_initial_state1, (batch_size, 1))
-                sub_initial_state2 = tf.get_variable(
-                    "layer{}_initial_state2".format(i),
-                    (1, self.feature_num_units),
-                    initializer=tf.random_normal_initializer(
-                        stddev=self.initial_stddev))
-                sub_initial_state2 = tf.tile(
-                    sub_initial_state2, (batch_size, 1))
-                sub_initial_state = tf.compat.v1.nn.rnn_cell.LSTMStateTuple(
-                    sub_initial_state1, sub_initial_state2)
-                initial_state.append(sub_initial_state)
-            initial_state = tuple(initial_state)
-        else:
-            raise NotImplementedError
+        feature, gen_flag, cur_argmax = self.rnn(all_discrete_attribute, feature_input_noise, 
+                                            feature_input_data)
         
         time = tf.convert_to_tensor(feature_input_noise).get_shape().as_list()[1]
         
         if time is None:
-            time = tf.shape(feature_input_noise)[1]
-        
-        #Feeds in the attribute generations into an RNN as well as the previous state to build up a time series
-        def compute(i, state, last_output, all_output,
-                            gen_flag, all_gen_flag, all_cur_argmax,
-                            last_cell_output):
+            time = tf.shape(feature_input_noise)[1]        
+        batch_size = tf.shape(feature_input_noise)[0]
 
-           
-            
-            input_all = [all_discrete_attribute]
-            
-            
-            
-            if self.noise:
-                input_all.append(feature_input_noise_reshape[i])
-                
-            if self.feed_back:
-                if feature_input_data_dim == 3:
-                    input_all.append(feature_input_data_reshape[i])
-                else:
-                    input_all.append(last_output)
-            
-            input_all = tf.concat(input_all, axis=1)
-            
-
-            
-            input_all = tf.expand_dims(input_all, axis=2)
-
-            
-            
-            cell_new_output, new_state = rnn_network(input_all, initial_state=state)
-
-
-
-            new_output_all = []
-            id_ = 0
-            for j in range(self.sample_len):
-                for k in range(len(self.feature_outputs)):
-                    output = self.feature_outputs[k]
-                    sub_output = tf.keras.layers.Dense(output.dim)(cell_new_output)
-                    if (output.type_ == OutputType.DISCRETE):
-                        sub_output = tf.nn.softmax(sub_output)
-                    elif (output.type_ == OutputType.CONTINUOUS):
-                        if (output.normalization ==
-                                Normalization.ZERO_ONE):
-                            sub_output = tf.nn.sigmoid(sub_output)
-                        elif (output.normalization ==
-                                Normalization.MINUSONE_ONE):
-                            sub_output = tf.nn.tanh(sub_output)
-                        else:
-                            raise Exception("unknown normalization"
-                                            " type")
-                    else:
-                        raise Exception("unknown output type")
-                    new_output_all.append(sub_output)
-                    id_ += 1
-            new_output = tf.concat(new_output_all, axis=1)
-            
-            for j in range(self.sample_len):
-                all_gen_flag = all_gen_flag.write(
-                    i * self.sample_len + j, gen_flag)
-                cur_gen_flag = tf.cast(tf.equal(tf.argmax(
-                    new_output_all[(j * len(self.feature_outputs) +
-                                    self.gen_flag_id)],
-                    axis=1), 0), dtype=tf.float32) 
-                cur_gen_flag = tf.reshape(cur_gen_flag, [-1, 1])
-                all_cur_argmax = all_cur_argmax.write(
-                    i * self.sample_len + j,
-                    tf.argmax(
-                        new_output_all[(j * len(self.feature_outputs) +
-                                        self.gen_flag_id)],
-                        axis=1))
-                
-                
-                
-                
-                gen_flag = gen_flag * cur_gen_flag
-
-                
-            return (tf.cast(i + 1, dtype=tf.int32),
-                    new_state,
-                    tf.cast(new_output, dtype=tf.float32),
-                    all_output.write(i, tf.cast(new_output, dtype=tf.float32)),
-                    tf.cast(gen_flag, dtype=tf.float32),
-                    all_gen_flag,
-                    all_cur_argmax,
-                    tf.cast(cell_new_output, dtype=tf.float32)) ###lots of dirty work going on here. Hopefully fix later
-
-        (i, state, _, feature, _, gen_flag, cur_argmax,
-            cell_output) = \
-            tf.while_loop(
-                lambda a, b, c, d, e, f, g, h:
-                tf.logical_and(a < time,
-                                tf.equal(tf.reduce_max(e), 1)),
-                compute,
-                (tf.cast(0, dtype=tf.int32),
-                    initial_state,
-                    feature_input_data if feature_input_data_dim == 2
-                    else feature_input_data_reshape[0],
-                    tf.TensorArray(tf.float32, time),
-                    tf.ones((batch_size, 1)),
-                    tf.TensorArray(tf.float32, time * self.sample_len),
-                    tf.TensorArray(tf.int64, time * self.sample_len),
-                    tf.zeros((batch_size, self.feature_num_units))))
-
-        self.model_weights = model.trainable_weights
-        self.rnn_weights = rnn_network.trainable_weights
-        self.trainable_w = self.model_weights + self.rnn_weights
-        
-       
-        
-        def fill_rest(i, all_output, all_gen_flag, all_cur_argmax):
-                all_output = all_output.write(
-                    i, tf.zeros((batch_size, self.feature_out_dim)))
-                
-                for j in range(self.sample_len):
-                    all_gen_flag = all_gen_flag.write(
-                        i * self.sample_len + j,
-                        tf.zeros((batch_size, 1)))
-                    all_cur_argmax = all_cur_argmax.write(
-                        i * self.sample_len + j,
-                        tf.zeros((batch_size,), dtype=tf.int64))
-                
-                return (i + 1,
-                        all_output,
-                        all_gen_flag,
-                        all_cur_argmax)
-        
-        _, feature, gen_flag, cur_argmax = tf.while_loop(
-                lambda a, b, c, d: a < time,
-                fill_rest,
-                (i, feature, gen_flag, cur_argmax))
-        
         feature = feature.stack()
             
         # time * batch_size * (dim * sample_len)
@@ -475,10 +549,14 @@ class DoppelGANgerGenerator(tf.keras.Model):
         return feature, all_attribute, gen_flag, length, cur_argmax
 
 
+    
+
+
+
 ### TESTING ###
 
 
-## TESTING ###
+# TESTING ###
 
 
 # sample_len = 130
@@ -494,6 +572,7 @@ class DoppelGANgerGenerator(tf.keras.Model):
 
 # data_attribute_outputs = [
 #     Output(type_=OutputType.DISCRETE, dim=330, is_gen_flag=False)
+    
 
 # ]
 # num_real_attribute = len(data_attribute_outputs)
@@ -501,7 +580,9 @@ class DoppelGANgerGenerator(tf.keras.Model):
 # no, seq_len, dim = data_feature.shape[0], data_feature.shape[1], data_feature.shape[2]
 
 
-
+# data_feature = data_feature.astype(np.float32) 
+# data_attribute = data_attribute.astype(np.float32)
+# data_gen_flag= data_gen_flag.astype(np.float32)
 
 
 
@@ -530,21 +611,25 @@ class DoppelGANgerGenerator(tf.keras.Model):
 #         real_attribute_mask=real_attribute_mask,
 #         sample_len=sample_len)
 
+# print("weights: ", len(generator.trainable_weights))
 
-# g_real_attribute_input_noise_train_pl_l = np.ones((3, 5))
-# g_addi_attribute_input_noise_train_pl_l = np.ones((3, 5)) 
-# g_feature_input_noise_train_pl_l = np.ones((3, 1, 5))
-# g_feature_input_data_train_pl_l = np.ones((3, 910))
+# g_real_attribute_input_noise_train_pl_l = np.ones((3, 5), dtype=np.float32)
+# g_addi_attribute_input_noise_train_pl_l = np.ones((3, 5), dtype=np.float32) 
+# g_feature_input_noise_train_pl_l = np.ones((3, 1, 5), dtype=np.float32)
+# g_feature_input_data_train_pl_l = np.ones((3, 910), dtype=np.float32)
+
+
 
 # (g_output_feature_train_tf, g_output_attribute_train_tf,
 #              g_output_gen_flag_train_tf, g_output_length_train_tf,
 #              g_output_argmax_train_tf) = \
-#                 generator.build(
+#                 generator(
 #                     g_real_attribute_input_noise_train_pl_l,
 #                     g_addi_attribute_input_noise_train_pl_l,
 #                     g_feature_input_noise_train_pl_l,
 #                     g_feature_input_data_train_pl_l,
 #                     train=True)
-
+# print(generator.summary())
+# sys.exit()
 # print("FINISHED")
 # ### END TESTING ###
