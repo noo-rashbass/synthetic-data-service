@@ -458,6 +458,15 @@ class DoppelGANger(tf.keras.Model):
                                                         batch_feature_input_data,
                                                         batch_data_feature, # batch_data_feature      
                                                         batch_data_attribute) # batch_data_attribute
+
+                        if self.attr_discriminator is not None:
+                            ad_loss = self.train_step_attr_d(batch_real_attribute_input_noise,
+                                                        batch_addi_attribute_input_noise,
+                                                        batch_feature_input_noise,
+                                                        batch_feature_input_data,
+                                                        batch_data_feature, # batch_data_feature      
+                                                        batch_data_attribute)
+
                     if self.attr_discriminator is not None:
                         ad_loss = self.train_step_attr_d(batch_real_attribute_input_noise,
                                                         batch_addi_attribute_input_noise,
@@ -472,6 +481,7 @@ class DoppelGANger(tf.keras.Model):
                                                         batch_feature_input_noise,
                                                         batch_feature_input_data)
 
+            print("d_loss", d_loss, "ad_loss", ad_loss, "g_loss", g_loss)
             
         return {"d_loss": d_loss, "ad_loss": ad_loss, "g_loss": g_loss}
 
