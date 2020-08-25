@@ -1,7 +1,7 @@
 KS_similarity_allpairs.csv
 Created by: Lulu
 Datetime: 17:00 BST 25/08/2020
-Notebook: 1.1&1.2 Distribution Similarity Tests 0824_Lulu.ipynb
+Notebook: 1_1&1_2_Distribution_Similarity_Tests_0824_Lulu.ipynb
 
 Values are Kolmogorov-Smirnov test p_values
 KS test null hypothesis: ori and gen samples come from same distribution

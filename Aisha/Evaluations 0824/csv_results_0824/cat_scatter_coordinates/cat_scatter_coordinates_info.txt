@@ -3,7 +3,7 @@ Files:	"<pair name>_df_cat.csv"  ---- each make one scatter diagram
 	"distance_series.csv" --- contains average distance of pts to the diagonal in each scatter diagram
 
 
-These dataframes and series were exported from "1.1&1.2 Distribution Similarity Tests 0824.ipynb" are for Rebeca to make DWP scatter diagrams. First row contains headers, rows are indexed by category.
+These dataframes and series were exported from "1_1&1_2_Distribution_Similarity_Tests_0824_Lulu.ipynb" are for Rebeca to make DWP scatter diagrams. First row contains headers, rows are indexed by category.
 
 A scatter diagram can be made for each of these pairs:
 ori_gen_pairs_cat = {'DoppelGANger_0824':[ori_cat, gen_3_cat],  

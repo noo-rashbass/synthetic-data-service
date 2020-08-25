@@ -1,6 +1,6 @@
 Exported: Lulu 18:00 BST 25/08/2020
 
-These dataframes were exported after the KS test pre-processing done within "1.1&1.2 Distribution Similarity Tests 0824.ipynb" are for Rebeca to plot histograms. First row contains headers.
+These dataframes were exported after the KS test pre-processing done within "1_1&1_2_Distribution_Similarity_Tests_0824_Lulu.ipynb" are for Rebeca to plot histograms. First row contains headers.
 
 A 2 sample histogram can be made for each of these pairs:
 ori_gen_pairs = {'DoppelGANger_0824':[ori_num, gen_3_num], 
