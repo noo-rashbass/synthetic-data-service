@@ -1,0 +1,14 @@
+Exported: Lulu 18:00 BST 25/08/2020
+
+These dataframes were exported after the KS test pre-processing done within "1.1&1.2 Distribution Similarity Tests 0824.ipynb" are for Rebeca to plot histograms. First row contains headers.
+
+A 2 sample histogram can be made for each of these pairs:
+ori_gen_pairs = {'DoppelGANger_0824':[ori_num, gen_3_num], 
+                 'DoppelGANger_0814':[dp_ori_nozero, dp_gen_nozero], 
+                'tGAN': [tgan_ori_nozero_num, tgan_gen_nozero_num], 
+                'tGAN_1':[tgan_ori_nozero_num, gen_1_num], 
+                'tGAN_2':[tgan_ori_nozero_num, gen_2_num],
+                'tGAN_4':[tgan_ori_nozero_num, gen_4_num]
+                }
+
+For KS test results see "KS_similarity_all_pairs.csv"
