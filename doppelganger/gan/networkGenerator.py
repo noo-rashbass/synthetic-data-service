@@ -11,7 +11,7 @@ import os
 import sys
 import output
 sys.modules["output"] = output
-from data_loading import sine_data_generation_f_a, real_data_loading_prism, renormalize
+#from data_loading import sine_data_generation_f_a, real_data_loading_prism, renormalize
 #tf.keras.backend.set_floatx('float32')
 
 class RNNInitialStateType(Enum):
@@ -38,8 +38,11 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
                                 self.sample_len)
     
         self.outputs ={}
-        for output in self.feature_outputs:
-            self.outputs[str(output.dim)] = tf.keras.layers.Dense(output.dim)
+        self.outputs ={}
+
+        for i in range(self.sample_len):
+            for k, output in enumerate(self.feature_outputs):
+                self.outputs[str(i) + ":" + str(k)] = tf.keras.layers.Dense(output.dim)
         
         self.gen_flag_id = None
         for i in range(len(self.feature_outputs)):
@@ -51,10 +54,9 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
         if self.feature_outputs[self.gen_flag_id].dim != 2:
             raise Exception("gen flag output's dim should be 2")
         
-        self.rnn_network = tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(self.feature_num_units) for _ in range(self.feature_num_layers)]), return_state=True)
+        #self.rnn_network = tf.keras.layers.RNN(tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(self.feature_num_units) for _ in range(self.feature_num_layers)]), return_state=True)
 
-
-        
+        self.rnn_network = tf.keras.layers.RNN(tf.keras.layers.LSTMCell(self.feature_num_units), return_state=True)
 
     def call(self, all_discrete_attribute, feature_input_noise, feature_input_data):
 
@@ -71,7 +73,7 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
         time = tf.convert_to_tensor(feature_input_noise).get_shape().as_list()[1]
         
         if time is None:
-            time = tf.shape(feature_input_noise)[1]        
+            time = tf.shape(feature_input_noise)[1]      
         batch_size = tf.shape(feature_input_noise)[0]
 
         initial_all_output = tf.TensorArray(tf.float32, time)
@@ -91,8 +93,15 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
             initial_state_ = rnn_network.zero_state(
                 batch_size, tf.float32)
         elif self.initial_state == RNNInitialStateType.RANDOM:
+            # For GRU
+            # input_ = tf.random.normal([batch_size, self.feature_num_units, 1]) ### Not sure if i got this right
+            # _, initial_state_ = self.rnn_network(input_)
+
+            # For LSTM
             input_ = tf.random.normal([batch_size, self.feature_num_units, 1]) ### Not sure if i got this right
-            _, initial_state_ = self.rnn_network(input_)
+            _, initial_state_h, intial_state_c = self.rnn_network(input_)
+            initial_state_ = [initial_state_h, intial_state_c]
+
         else:
             raise NotImplementedError
 
@@ -100,10 +109,8 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
                             gen_flag, all_gen_flag, all_cur_argmax,
                             last_cell_output):
 
-           
             
-            input_all = [tf.cast(all_discrete_attribute, dtype=tf.float32)]
-            
+            input_all = [tf.cast(all_discrete_attribute, dtype=tf.float32)]            
             
             if self.noise:
                 input_all.append(tf.cast(feature_input_noise_reshape[i], dtype=tf.float32))
@@ -112,7 +119,11 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
 
             input_all = tf.expand_dims(input_all, axis=2)
 
-            cell_new_output, new_state = self.rnn_network(input_all, initial_state=state)
+            # For GRU
+            # cell_new_output, new_state = self.rnn_network(input_all, initial_state=state)
+
+            cell_new_output, new_state_h, new_state_c = self.rnn_network(input_all, initial_state=state)
+            new_state = [new_state_h, new_state_c]
 
 
             new_output_all = []
@@ -120,7 +131,7 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
             for j in range(self.sample_len):
                 for k in range(len(self.feature_outputs)):
                     output = self.feature_outputs[k]
-                    sub_output = self.outputs[str(output.dim)](cell_new_output)
+                    sub_output = self.outputs[str(j) + ":" + str(k)](cell_new_output)
                     if (output.type_ == OutputType.DISCRETE):
                         sub_output = tf.nn.softmax(sub_output)
                     elif (output.type_ == OutputType.CONTINUOUS):
@@ -138,6 +149,7 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
                     new_output_all.append(sub_output)
                     id_ += 1
             new_output = tf.concat(new_output_all, axis=1)
+
             
             for j in range(self.sample_len):
                 all_gen_flag = all_gen_flag.write(
@@ -154,12 +166,8 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
                                         self.gen_flag_id)],
                         axis=1))
                 
-                
-                
-                
                 gen_flag = gen_flag * cur_gen_flag
 
-                
             return (i + 1, 
                     new_state,
                     new_output, 
@@ -184,9 +192,6 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
                     initial_all_gen_flag, 
                     initial_all_cur_argmax, 
                     initial_last_cell_output))
-
-        
-        
        
         
         def fill_rest(i, all_output, all_gen_flag, all_cur_argmax):
@@ -211,6 +216,8 @@ class DoppelGANgerGeneratorRNN(tf.keras.layers.Layer):
                 fill_rest,
                 (i, feature, gen_flag, cur_argmax))
         
+        
+
         return feature, gen_flag, cur_argmax
         
         
@@ -256,10 +263,9 @@ class DoppelGANgerGeneratorMLP(tf.keras.layers.Layer):
         
         self.initial_layers=[tf.keras.layers.Dense(self.attribute_num_units, activation='relu'), tf.keras.layers.Dense(self.attribute_num_units, activation='relu')]
         self.outputs={}
-        for real_fake in self.__dict__['all_attribute_outputs']:
-            for output in real_fake:
-                self.outputs[str(output.dim)] = tf.keras.layers.Dense(output.dim)
-        
+        for real_fake in range(len(self.__dict__['all_attribute_outputs'])):
+            for output in range(len(self.__dict__['all_attribute_outputs'][real_fake])):
+                self.outputs[str(real_fake) + ':' + str(output)] = tf.keras.layers.Dense(self.__dict__['all_attribute_outputs'][real_fake][output].dim)
 
         self.real_attribute_outputs = []
         self.addi_attribute_outputs = []
@@ -343,17 +349,14 @@ class DoppelGANgerGeneratorMLP(tf.keras.layers.Layer):
                 layers = [all_attribute_input_noise[part_i]]
             
             #build a feedforward network output FUNCTIONAL API
-            
-            
             for layer in self.layers_:
                 try:
                     x = layer[0](x)#1st
                     x = layer[1](x, training = training)
                 except Exception as e:
                     x = self.initial_layers[part_i](layers[-1])
-                    x = layer[0](x)# 2nd
-                    x = layer[1](x)
-                    
+                    #x = layer[0](x)# 2nd
+                    x = layer[1](x)       
             
             part_attribute = []
             part_discrete_attribute = []
@@ -362,7 +365,7 @@ class DoppelGANgerGeneratorMLP(tf.keras.layers.Layer):
                 output = all_attribute_outputs[part_i][i]              
                
                 
-                sub_output_ori = self.outputs[str(output.dim)](x) ##Not 100% sure this is doing the right thing
+                sub_output_ori = self.outputs[str(part_i) + ':' + str(i)](x) ##Not 100% sure this is doing the right thing
                 
                 if (output.type_ == OutputType.DISCRETE):
                     sub_output = tf.nn.softmax(sub_output_ori)
@@ -394,12 +397,12 @@ class DoppelGANgerGeneratorMLP(tf.keras.layers.Layer):
                 part_discrete_attribute, axis=1)
             part_attribute = tf.reshape(
                 part_attribute,
-                [batch_size, all_attribute_out_dim[part_i]])
+                [-1, all_attribute_out_dim[part_i]])
 
             
             part_discrete_attribute = tf.reshape(
                 part_discrete_attribute,
-                [batch_size, all_attribute_out_dim[part_i]])
+                [-1, all_attribute_out_dim[part_i]])
             
             # batch_size * dim
         
@@ -415,10 +418,10 @@ class DoppelGANgerGeneratorMLP(tf.keras.layers.Layer):
         all_discrete_attribute = tf.concat(all_discrete_attribute, axis=1)
         all_attribute = tf.reshape(
             all_attribute,
-            [batch_size, self.attribute_out_dim])
+            [-1, self.attribute_out_dim])
         all_discrete_attribute = tf.reshape(
             all_discrete_attribute,
-            [batch_size, self.attribute_out_dim])
+            [-1, self.attribute_out_dim])
 
         return all_attribute, all_discrete_attribute  
 
@@ -551,58 +554,31 @@ class DoppelGANgerGenerator(tf.keras.Model):
 
 
     
+# from load_data import *
+# from util import *
+# seq_len = 7
+# (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data("data")
 
-
-
-### TESTING ###
-
-
-# TESTING ###
-
-
-# sample_len = 130
-# auto_normalize=True
-
-# data_feature_outputs = [
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False),
-#     output.Output(type_=OutputType.CONTINUOUS, dim=1, normalization=Normalization.ZERO_ONE, is_gen_flag=False)
-# ]
-
-# data_attribute_outputs = [
-#     Output(type_=OutputType.DISCRETE, dim=330, is_gen_flag=False)
-    
-
-# ]
+# print("-----DATA LOADING PART-----")
+# print(data_feature.shape)
+# print(data_attribute.shape)
+# print(data_gen_flag.shape)
 # num_real_attribute = len(data_attribute_outputs)
-# data_feature, data_attribute, data_gen_flag, min_, max_ = real_data_loading_prism()
-# no, seq_len, dim = data_feature.shape[0], data_feature.shape[1], data_feature.shape[2]
 
+# (data_feature, data_attribute, data_attribute_outputs, real_attribute_mask) = \
+#     normalize_per_sample(data_feature, data_attribute, data_feature_outputs,data_attribute_outputs)
 
-# data_feature = data_feature.astype(np.float32) 
-# data_attribute = data_attribute.astype(np.float32)
-# data_gen_flag= data_gen_flag.astype(np.float32)
+# print("-----DATA NORMALIZATION PART-----")
+# print(real_attribute_mask)
+# print(data_feature.shape)
+# print(data_attribute.shape)
+# print(len(data_attribute_outputs))
 
-
-
-# if auto_normalize:
-#     (data_feature, data_attribute, data_attribute_outputs,
-#     real_attribute_mask) = \
-#         normalize_per_sample(
-#             data_feature, data_attribute, data_feature_outputs,
-#             data_attribute_outputs)
-# else:
-#     real_attribute_mask = [True] * len(data_attribute_outputs)
-
-
-
-
-
+# print("-----ADD GEN FLAG PART -----")
 # data_feature, data_feature_outputs = add_gen_flag(
-#     data_feature, data_gen_flag, data_feature_outputs, sample_len)
-
+#         data_feature, data_gen_flag, data_feature_outputs, seq_len)
+# print(data_feature.shape)
+# print(len(data_feature_outputs))
 
 # generator = DoppelGANgerGenerator(
 #         feed_back=False,
@@ -610,15 +586,19 @@ class DoppelGANgerGenerator(tf.keras.Model):
 #         feature_outputs=data_feature_outputs,
 #         attribute_outputs=data_attribute_outputs,
 #         real_attribute_mask=real_attribute_mask,
-#         sample_len=sample_len)
+#         sample_len=seq_len)
 
-# print("weights: ", len(generator.trainable_weights))
+# print("done")
 
-# g_real_attribute_input_noise_train_pl_l = np.ones((3, 5), dtype=np.float32)
-# g_addi_attribute_input_noise_train_pl_l = np.ones((3, 5), dtype=np.float32) 
-# g_feature_input_noise_train_pl_l = np.ones((3, 1, 5), dtype=np.float32)
-# g_feature_input_data_train_pl_l = np.ones((3, 910), dtype=np.float32)
+# # g_real_attribute_input_noise_train_pl_l = np.ones((10, 5)) *0.9
+# # g_addi_attribute_input_noise_train_pl_l = np.ones((10, 5)) *0.9
+# # g_feature_input_noise_train_pl_l = np.ones((10, 1, 5)) *0.9
+# # g_feature_input_data_train_pl_l = np.ones((10, 28)) *0.9
 
+# g_feature_input_noise_train_pl_l = np.random.normal(size=[10, 1, 5]).astype(np.float32)
+# g_real_attribute_input_noise_train_pl_l = np.random.normal(size=[10, 5]).astype(np.float32)
+# g_addi_attribute_input_noise_train_pl_l = np.random.normal(size=[10, 5]).astype(np.float32)
+# g_feature_input_data_train_pl_l = np.zeros([10, 28 ]).astype(np.float32)
 
 
 # (g_output_feature_train_tf, g_output_attribute_train_tf,
@@ -630,7 +610,8 @@ class DoppelGANgerGenerator(tf.keras.Model):
 #                     g_feature_input_noise_train_pl_l,
 #                     g_feature_input_data_train_pl_l,
 #                     train=True)
-# print(generator.summary())
-# sys.exit()
-# print("FINISHED")
-# ### END TESTING ###
+
+# print("g out")
+# print(g_output_feature_train_tf)
+
+# print("done")
