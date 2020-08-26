@@ -1,0 +1,33 @@
+Exported: Lulu 19:00 BST 25/08/2020
+Files:	"<pair name>_df_cat.csv"  ---- each make one scatter diagram
+	"distance_series.csv" --- contains average distance of pts to the diagonal in each scatter diagram
+
+
+These dataframes and series were exported from "1_1&1_2_Distribution_Similarity_Tests_0824_Lulu.ipynb" are for Rebeca to make DWP scatter diagrams. First row contains headers, rows are indexed by category.
+
+A scatter diagram can be made for each of these pairs:
+ori_gen_pairs_cat = {'DoppelGANger_0824':[ori_cat, gen_3_cat],  
+                  'tGAN': [tgan_ori_nozero_cat, tgan_gen_nozero_cat], 
+                  'tGAN_1':[tgan_ori_nozero_cat, gen_1_cat], 
+                  'tGAN_2':[tgan_ori_nozero_cat, gen_2_cat],
+                  'tGAN_4':[tgan_ori_nozero_cat, gen_4_cat]
+                  }
+
+Categories are:
+diar_No, diar_Yes, head_No, head_Yes
+
+----------------------------------------------------------------- 
+
+Example:
+In the notebook, Aisha plots 4 points per pair, but since the probability of _No is 1-probaility of _Yes, only 2 points need to be plotted (one per symptom)
+See below the two "<-" rows of tGAN_2_df_cat.csv
+
+				tGAN_2_generated	tGAN_2_original
+diar_No		1.0000000	0.9928168		0.9776433
+		0.0000000	0.0071832		0.0223567
+diar_Yes	0.0000000	0.9953188		0.9776433
+		1.0000000	0.0046812		0.0223567 	<-
+head_No		1.0000000	0.9020985		0.8893462
+		0.0000000	0.0979015		0.1106538
+head_Yes	0.0000000	0.9022599		0.8893462
+		1.0000000	0.0977401		0.1106538	<-
