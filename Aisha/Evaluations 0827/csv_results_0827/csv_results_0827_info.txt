@@ -1,0 +1,8 @@
+discriminative_dop_results_0827am.csv
+
+Exported by: Lulu
+Notebook: 2.2 discriminative_model_0827_Lulu.ipynb
+Real dataset: cat_time_5abovevisits_all.csv
+Synthetic set: gen_doptf2_cat_5abovevisits_e200_lstm.csv (Created by Evonne)
+
+Description: Sklearn classification report as dataframe
