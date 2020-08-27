@@ -7,8 +7,8 @@ import numpy as np
 from enum import Enum
 import os
 
-num_layers = 2 #5
-seq_len = 7
+num_layers = 5 #5
+seq_len = 130
 
 (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data("data")
 
@@ -26,7 +26,7 @@ data_feature, data_feature_outputs = add_gen_flag(data_feature, data_gen_flag, d
 #check
 features_dim = data_feature.shape[2] #4 #after some magic by utils, dim becomes 4??
 
-total_generate_num_sample = 500
+total_generate_num_sample = 1347
 
 #discriminator
 input_feature_d = tf.keras.Input(shape=(seq_len, features_dim)) #TODO: get proper features_dim

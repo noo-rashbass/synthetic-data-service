@@ -9,10 +9,11 @@ from networkGenerator import DoppelGANgerGenerator
 from doppelganger import DoppelGANger
 
 if __name__ == "__main__":
-    seq_len = 7
-    batch_size = 25
+    # NOTE: Remember to change seq_len, path_to_data and num_layers in network.py accordingly
+    seq_len = 130
+    batch_size = 64
     epochs = 2
-    total_generate_num_sample = 500
+    total_generate_num_sample = 1347
     path_to_data = "data"
 
     (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data(path_to_data)
@@ -68,9 +69,9 @@ if __name__ == "__main__":
         g_attr_d_coe=1.0)
 
     #combine data attributes and features into one to be fed into the model
-    data_attribute_in = tf.expand_dims(data_attribute, axis=1)
-    data_attribute_in = tf.repeat(data_attribute_in, repeats=seq_len, axis=1)
-    data_all_in = tf.cast(tf.concat([data_feature, data_attribute_in], axis=2), dtype=tf.float32)
+    # data_attribute_in = tf.expand_dims(data_attribute, axis=1)
+    # data_attribute_in = tf.repeat(data_attribute_in, repeats=seq_len, axis=1)
+    # data_all_in = tf.cast(tf.concat([data_feature, data_attribute_in], axis=2), dtype=tf.float32)
 
     print("----START TRAINING-----")
     gan.compile()
@@ -80,7 +81,8 @@ if __name__ == "__main__":
     # callback2 = tf.keras.callbacks.EarlyStopping(monitor='ad_loss', patience=3)
     # callback3 = tf.keras.callbacks.EarlyStopping(monitor='g_loss', patience=3)
 
-    gan.fit(data_all_in, batch_size=batch_size, epochs=epochs) #, callbacks=[callback1, callback2]
+    #gan.fit(data_all_in, batch_size=batch_size, epochs=epochs) #, callbacks=[callback1, callback2]
+    gan.train_step()
 
     print("----FINISHED TRAINING-----")
 
