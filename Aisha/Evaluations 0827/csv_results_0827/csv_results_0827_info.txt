@@ -1,8 +1,19 @@
 discriminative_dop_results_0827am.csv
 
-Exported by: Lulu
+Run and exported by: Lulu
 Notebook: 2.2 discriminative_model_0827_Lulu.ipynb
 Real dataset: cat_time_5abovevisits_all.csv
 Synthetic set: gen_doptf2_cat_5abovevisits_e200_lstm.csv (Created by Evonne)
 
-Description: Sklearn classification report as dataframe
+Description: Sklearn classification report as dataframe.
+
+---------------------------------------------------------
+
+predictive_<trts/tstr/trtr/tsts>_dop_results_0827am.csv		(4 files)
+
+Run and exported by: Lulu
+Notebook: predictive_model_0827am_Lulu.ipynb
+Real dataset: cat_time_5abovevisits_all.csv
+Synthetic set: gen_doptf2_cat_5abovevisits_e200_lstm.csv (Created by Evonne)
+
+Description: Dataframe of predictive model params, test_loss and test_metric for each numerical row (no binary rows used)
