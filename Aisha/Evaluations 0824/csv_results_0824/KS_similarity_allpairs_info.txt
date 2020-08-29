@@ -1,0 +1,21 @@
+KS_similarity_allpairs.csv
+Created by: Lulu
+Datetime: 17:00 BST 25/08/2020
+Notebook: 1_1&1_2_Distribution_Similarity_Tests_0824_Lulu.ipynb
+
+Values are Kolmogorov-Smirnov test p_values
+KS test null hypothesis: ori and gen samples come from same distribution
+The smaller the p_value, the more likely the null is to be rejected
+--------------------------------------------------------------------
+Ori/gen pairs for each column of the results are:
+
+ori_gen_pairs = {'DoppelGANger_0824':[ori_num, gen_3_num], 
+                 'DoppelGANger_0814':[dp_ori_nozero, dp_gen_nozero], 
+                'tGAN': [tgan_ori_nozero_num, tgan_gen_nozero_num], 
+                'tGAN_1':[tgan_ori_nozero_num, gen_1_num], 
+                'tGAN_2':[tgan_ori_nozero_num, gen_2_num],
+                'tGAN_4':[tgan_ori_nozero_num, gen_4_num]
+                }
+---------------------------------------------------------------------
+Rows of results correspond to dimensions (columns) of the data:
+dday, height, weight, temp, vomit_dur, cough_dur, age

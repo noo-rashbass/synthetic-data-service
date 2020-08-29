@@ -1,0 +1,29 @@
+digraph Tree {
+node [shape=box, style="filled, rounded", color="black", fontname=helvetica] ;
+edge [fontname=helvetica] ;
+0 [label="Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092] <= 4966.5\ngini = 0.18\nsamples = 30060\nvalue = [27049, 3011]\nclass = No", fillcolor="#e88f4f"] ;
+1 [label="Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092] <= 44.0\ngini = 0.058\nsamples = 27461\nvalue = [26634, 827]\nclass = No", fillcolor="#e6853f"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="Asexual Plasmodium parasite density, by microscopy [EUPATH_0000092] <= 13.0\ngini = 0.001\nsamples = 24693\nvalue = [24679, 14]\nclass = No", fillcolor="#e58139"] ;
+1 -> 2 ;
+3 [label="gini = 0.0\nsamples = 24489\nvalue = [24489, 0]\nclass = No", fillcolor="#e58139"] ;
+2 -> 3 ;
+4 [label="Febrile [EUPATH_0000097] <= 0.0\ngini = 0.128\nsamples = 204\nvalue = [190, 14]\nclass = No", fillcolor="#e78a48"] ;
+2 -> 4 ;
+5 [label="gini = 0.0\nsamples = 190\nvalue = [190, 0]\nclass = No", fillcolor="#e58139"] ;
+4 -> 5 ;
+6 [label="gini = 0.0\nsamples = 14\nvalue = [0, 14]\nclass = Yes", fillcolor="#399de5"] ;
+4 -> 6 ;
+7 [label="Febrile [EUPATH_0000097] <= 0.0\ngini = 0.415\nsamples = 2768\nvalue = [1955, 813]\nclass = No", fillcolor="#f0b58b"] ;
+1 -> 7 ;
+8 [label="gini = 0.0\nsamples = 1955\nvalue = [1955, 0]\nclass = No", fillcolor="#e58139"] ;
+7 -> 8 ;
+9 [label="gini = 0.0\nsamples = 813\nvalue = [0, 813]\nclass = Yes", fillcolor="#399de5"] ;
+7 -> 9 ;
+10 [label="Febrile [EUPATH_0000097] <= 0.0\ngini = 0.268\nsamples = 2599\nvalue = [415, 2184]\nclass = Yes", fillcolor="#5fb0ea"] ;
+0 -> 10 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+11 [label="gini = 0.0\nsamples = 415\nvalue = [415, 0]\nclass = No", fillcolor="#e58139"] ;
+10 -> 11 ;
+12 [label="gini = 0.0\nsamples = 2184\nvalue = [0, 2184]\nclass = Yes", fillcolor="#399de5"] ;
+10 -> 12 ;
+}
