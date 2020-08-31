@@ -22,7 +22,7 @@ disc_static_noise_multiplier = 0.0001
 
 
 # Non-static optimizers
-def make_timegan_optimizsers(learning_rate = 1e-4, num_microbatches = None):
+def make_timegan_optimizers(learning_rate = 1e-4, num_microbatches = None):
 
 	embedder0_optimizer = DPOptimizer(
 	    l2_norm_clip=embedder0_clip,

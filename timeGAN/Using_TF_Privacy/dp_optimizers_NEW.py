@@ -1,5 +1,5 @@
 # Version of TF privacy optimizers modified by Ricardo S. Carvalho [https://github.com/ricardocarvalhods/dpcgan]
-# Lulu: used this to solve compute_gradient vs apply_gradient issue in DP_MNIST_DCGAN which only occured when running locally in .py
+# Lulu: used this to solve compute_gradient vs apply_gradient issue in DP_MNIST_DCGAN which only occurred when running locally in .py
 # Other's have raised the issue here: https://github.com/tensorflow/privacy/issues/106
 # it takes 9 mins for 1 epoch on my Surface compared to 10 secs on Colab
 
