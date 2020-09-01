@@ -1,0 +1,13 @@
+digraph Tree {
+node [shape=box, style="filled, rounded", color="black", fontname=helvetica] ;
+edge [fontname=helvetica] ;
+0 [label="Malaria diagnosis and parasite status [EUPATH_0000338] <= 5.5\ngini = 0.216\nsamples = 48722\nvalue = [42706, 6015, 1]\nclass = No", fillcolor="#e99355"] ;
+1 [label="gini = 0.0\nsamples = 42706\nvalue = [42706, 0, 0]\nclass = No", fillcolor="#e58139"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label="Malaria treatment [EUPATH_0000740] <= 4.5\ngini = 0.0\nsamples = 6016\nvalue = [0, 6015, 1]\nclass = Yes", fillcolor="#39e581"] ;
+0 -> 2 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+3 [label="gini = 0.0\nsamples = 6015\nvalue = [0, 6015, 0]\nclass = Yes", fillcolor="#39e581"] ;
+2 -> 3 ;
+4 [label="gini = 0.0\nsamples = 1\nvalue = [0, 0, 1]\nclass = nan", fillcolor="#8139e5"] ;
+2 -> 4 ;
+}
