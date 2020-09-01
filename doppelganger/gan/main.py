@@ -4,7 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os
 
-from network import discriminator_model, attrdiscriminator_model
+from network import make_discriminator, make_attrdiscriminator
 from networkGenerator import DoppelGANgerGenerator
 from doppelganger import DoppelGANger
 
@@ -19,8 +19,8 @@ if __name__ == "__main__":
     (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data(path_to_data)
 
     print("-----DATA LOADING-----")
-    print(data_feature.shape)
-    print(data_attribute.shape)
+    print(data_feature.shape)          # original features_dim        
+    print(data_attribute.shape)        # original attributes_dim
     print(data_gen_flag.shape)
     num_real_attribute = len(data_attribute_outputs)
 
@@ -30,14 +30,19 @@ if __name__ == "__main__":
     print("-----DATA NORMALIZATION-----")
     print(real_attribute_mask)
     print(data_feature.shape)
-    print(data_attribute.shape)
+    attributes_dim = data_attribute.shape[1]    # attributes_dim to be fed into model
+    print(data_attribute.shape)       
     print(len(data_attribute_outputs))
 
     print("-----ADD GEN FLAG -----")
     data_feature, data_feature_outputs = add_gen_flag(
             data_feature, data_gen_flag, data_feature_outputs, seq_len)
-    print(data_feature.shape)
+    features_dim = data_feature.shape[2]    # features dim to be fed into model
+    print(data_feature.shape)        
     print(len(data_feature_outputs))
+
+    discriminator_model = make_discriminator(seq_len, features_dim, attributes_dim)
+    attrdiscriminator_model = make_attrdiscriminator(attributes_dim)
 
     generator = DoppelGANgerGenerator(
             feed_back=False,
