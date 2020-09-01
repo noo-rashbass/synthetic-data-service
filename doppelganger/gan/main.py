@@ -9,7 +9,6 @@ from networkGenerator import DoppelGANgerGenerator
 from doppelganger import DoppelGANger
 
 if __name__ == "__main__":
-    # NOTE: Remember to change seq_len, path_to_data and num_layers in network.py accordingly
     seq_len = 130
     batch_size = 64
     epochs = 2
