@@ -22,6 +22,7 @@ data_loading.py
 
 ## Necessary Packages
 import numpy as np
+import pandas as pd
 
 
 def MinMaxScaler(data):
@@ -33,8 +34,8 @@ def MinMaxScaler(data):
   Returns:
     - norm_data: normalized data
   """
-  numerator = data - np.min(data, 0)
-  denominator = np.max(data, 0) - np.min(data, 0)
+  numerator = data - np.nanmin(data, 0)
+  denominator = np.nanmax(data, 0) - np.nanmin(data, 0)
   norm_data = numerator / (denominator + 1e-7)
   return norm_data
 
@@ -87,22 +88,33 @@ def real_data_loading (data_name, seq_len):
   Returns:
     - data: preprocessed data.
   """  
-  assert data_name in ['stock','energy']
+  assert data_name in ['stock','energy', 'prism', 'prism_padding']
   
   if data_name == 'stock':
     ori_data = np.loadtxt('data/stock_data.csv', delimiter = ",",skiprows = 1)
   elif data_name == 'energy':
     ori_data = np.loadtxt('data/energy_data.csv', delimiter = ",",skiprows = 1)
-        
+  elif data_name == 'prism':
+    #so that the interpolate method can be used to fillnas
+    ori_data = pd.read_csv('data/dt_10visits_noid.csv')
+    ori_data.interpolate(method = 'linear', inplace=True)
+    ori_data = np.asarray(ori_data)
+  elif data_name == "prism_padding":
+    #so that the interpolate method can be used to fillnas
+    ori_data = pd.read_csv('data/500_imputed_patients.csv')
+    ori_data.interpolate(method = 'linear', inplace=True)
+    ori_data = np.asarray(ori_data)
+
   # Flip the data to make chronological data
-  ori_data = ori_data[::-1]
+  if data_name == "stock" or data_name == "energy":
+    ori_data = ori_data[::-1]
   # Normalize the data
-  ori_data = MinMaxScaler(ori_data)
+  #ori_data = MinMaxScaler(ori_data)
     
   # Preprocess the dataset
   temp_data = []    
   # Cut data by sequence length
-  for i in range(0, len(ori_data) - seq_len):
+  for i in range(0, len(ori_data), seq_len):
     _x = ori_data[i:i + seq_len]
     temp_data.append(_x)
         
@@ -112,4 +124,43 @@ def real_data_loading (data_name, seq_len):
   for i in range(len(temp_data)):
     data.append(temp_data[idx[i]])
     
-  return data
+  return temp_data
+
+#currently not used as tgan can't really generate good data with varying time length
+def real_data_loading_prism_dt():
+  """
+  loads data with different visit length
+  """
+
+  data = pd.read_csv('data/time_patients_25to50visits.csv')
+
+  min_val = data.min()
+  max_val = data.max()
+
+  scaled_data = (data - min_val) / (max_val - min_val + 1e-7)
+  scaled_data = scaled_data.fillna(-1)
+
+  id_unique = scaled_data.id.unique()
+
+  row_list =[] 
+  j = 0
+  #iterate over id
+  for i in id_unique:  
+      id_list = []
+      count = 0
+      for index, rows in scaled_data[j:j+51].iterrows(): 
+          # get row of the same id 
+          if rows.id == i:
+              count +=1
+              my_list =[rows.day_num, rows.height, rows.weight, rows.temp, rows.vomit_dur, rows.cough_dur]
+        
+              #append a row to its id list
+              id_list.append(my_list) 
+      #append the id list to the whole patients list
+      row_list.append((id_list))
+      j +=count
+  
+  min_val = min_val.drop('id')
+  max_val = max_val.drop('id') 
+
+  return np.asarray(row_list), min_val, max_val

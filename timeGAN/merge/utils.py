@@ -125,3 +125,23 @@ def batch_generator(data, time, batch_size):
   T_mb = np.array([time[i] for i in train_idx])
   
   return X_mb, T_mb
+
+def batch_generator_2(data, batch_size):
+
+
+  no = len(data)
+  idx = np.random.permutation(no)
+  train_idx = idx[:batch_size]     
+            
+  X_mb = np.array([data[i] for i in train_idx])
+  
+  return X_mb
+
+def random_generator_2 (batch_size, z_dim, max_seq_len):
+  Z_mb = list()
+  for i in range(batch_size):
+    temp = np.zeros([max_seq_len, z_dim])
+    temp_Z = np.random.uniform(0., 1, [max_seq_len, z_dim])
+    #temp[:T_mb[i],:] = temp_Z
+    Z_mb.append(temp_Z)
+  return np.array(Z_mb)
