@@ -4,98 +4,27 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-
-def draw_attribute(data, outputs, path=None):
-    if isinstance(data, list):
-        num_sample = len(data)
-    else:
-        num_sample = data.shape[0]
-    id_ = 0
-    for i in range(len(outputs)):
-        if outputs[i].type_ == OutputType.CONTINUOUS:
-            for j in range(outputs[i].dim):
-                plt.figure()
-                for k in range(num_sample):
-                    plt.scatter(
-                        k,
-                        data[k][id_],
-                        s=12)
-                if path is None:
-                    plt.show()
-                else:
-                    plt.savefig("{},output-{},dim-{}.png".format(path, i, j))
-                plt.xlabel("sample")
-                plt.close()
-                id_ += 1
-        elif outputs[i].type_ == OutputType.DISCRETE:
-            plt.figure()
-            for j in range(num_sample):
-                plt.scatter(
-                    j,
-                    np.argmax(data[j][id_: id_ + outputs[i].dim],
-                              axis=0),
-                    s=12)
-            plt.xlabel("sample")
-            if path is None:
-                plt.show()
-            else:
-                plt.savefig("{},output-{}.png".format(path, i))
-            plt.close()
-            id_ += outputs[i].dim
-        else:
-            raise Exception("unknown output type")
-
-
-def draw_feature(data, lengths, outputs, path=None):
-    if isinstance(data, list):
-        num_sample = len(data)
-    else:
-        num_sample = data.shape[0]
-    id_ = 0
-    for i in range(len(outputs)):
-        if outputs[i].type_ == OutputType.CONTINUOUS:
-            for j in range(outputs[i].dim):
-                plt.figure()
-                for k in range(num_sample):
-                    plt.plot(
-                        range(int(lengths[k])),
-                        data[k][:int(lengths[k]), id_],
-                        "o-",
-                        markersize=3,
-                        label="sample-{}".format(k))
-                plt.legend()
-                if path is None:
-                    plt.show()
-                else:
-                    plt.savefig("{},output-{},dim-{}.png".format(path, i, j))
-                plt.close()
-                id_ += 1
-        elif outputs[i].type_ == OutputType.DISCRETE:
-            plt.figure()
-            for j in range(num_sample):
-                plt.plot(
-                    range(int(lengths[j])),
-                    np.argmax(data[j][:int(lengths[j]),
-                                      id_: id_ + outputs[i].dim],
-                              axis=1),
-                    "o-",
-                    markersize=3,
-                    label="sample-{}".format(j))
-
-            plt.legend()
-            if path is None:
-                plt.show()
-            else:
-                plt.savefig("{},output-{}.png".format(path, i))
-            plt.close()
-            id_ += outputs[i].dim
-        else:
-            raise Exception("unknown output type")
-
-
 def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
                            data_attribute_outputs, gen_flags,
                            num_real_attribute):
+    """
+    -gets correct dimension for generated data attribute (num_ori_attributes) 
+    from num_ori_attributes + num_created_attributes
+    -renormalizes data_feature and replaces part of the time-series that has ended with zeros
+
+    Args:
+    data_feature: generated data features (num_samples, seq_len, num_features)
+    data_attribute: generated data attributes (num_samples, num_ori_attributes + num_created_attributes)
+    data_feature_outputs: list that describes generated feature output type, dimension, normalization
+    data_attribute_outputs: list that describes generated attribute output type, dimension, normalization
+    gen_flags: generation flag for generated data
+    num_real_attribute: number of original attributes
+
+    Returns:
+    data_feature: generated data feature taking into account gen flags
+    data_attribute: generated data attribute of the original dimension
+    """
+
     attr_dim = 0
     for i in range(num_real_attribute):
         attr_dim += data_attribute_outputs[i].dim
@@ -103,6 +32,7 @@ def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
     fea_dim = 0
     for output in data_feature_outputs:
+        # for each continous feature
         if output.type_ == OutputType.CONTINUOUS:
             for _ in range(output.dim):
                 max_plus_min_d_2 = data_attribute[:, attr_dim]
@@ -123,21 +53,41 @@ def renormalize_per_sample(data_feature, data_attribute, data_feature_outputs,
                     data_feature[:, :, fea_dim] * (max_ - min_) + min_
 
                 fea_dim += 1
+        #if feature is discrete, add feature dim
         else:
             fea_dim += output.dim
 
-    tmp_gen_flags = np.expand_dims(gen_flags, axis=2)
-    data_feature = data_feature * tmp_gen_flags
+    tmp_gen_flags = np.expand_dims(gen_flags, axis=2) # (num_sample, seq_len, 1)
+    data_feature = data_feature * tmp_gen_flags # (num_sample, seq_len, num_features)
 
-    data_attribute = data_attribute[:, 0: attr_dim_cp]
+    # get back only the original attributes
+    data_attribute = data_attribute[:, 0: attr_dim_cp] # (num_sample, 1)
 
     return data_feature, data_attribute
 
 
 def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
                          data_attribute_outputs):
+    """
+    -adds 2 extra attributes ((max +- min)/2) for each feature for each sample 
+    to the original attribute
+    -normalizes data feature
+    Args:
+    data_feature: original data feature
+    data_attribute: original data attribute
+    data_feature_outputs: list that describes original feature output type, dimension, normalization
+    data_attribute_outputs: list that describes original attribute output type, dimension, normalization
+
+    Returns:
+    data_feature: normalized data feature
+    data_attribute: original data attribute + newly created attributes
+    data_attribute_outputs: list that describes original + created attribute output type, dimension, normalization
+    real_attribute_mask: boolean list specifying if attributes are orginal or newly created
+    """
+
     # assume all samples have maximum length
-    data_feature_min = np.nanmin(data_feature, axis=1)
+    # get max and min for each feature for each sample
+    data_feature_min = np.nanmin(data_feature, axis=1) # (total_sample, num_features)
     data_feature_max = np.nanmax(data_feature, axis=1)
 
     additional_attribute = []
@@ -145,9 +95,10 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
     dim = 0
     for output in data_feature_outputs:
+        #for each feature, we create 2 extra attributes with the min & max
         if output.type_ == OutputType.CONTINUOUS:
             for _ in range(output.dim):
-                max_ = data_feature_max[:, dim]
+                max_ = data_feature_max[:, dim] # (total_sample, )
                 min_ = data_feature_min[:, dim]
 
                 additional_attribute.append((max_ + min_) / 2.0)
@@ -176,12 +127,13 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
         else:
             dim += output.dim
 
+    # create a mask for original attribute and attributed we just created
     real_attribute_mask = ([True] * len(data_attribute_outputs) +
                            [False] * len(additional_attribute_outputs))
 
-    additional_attribute = np.stack(additional_attribute, axis=1)
+    additional_attribute = np.stack(additional_attribute, axis=1) # (num_sample, num_continuous_features * 2)
     data_attribute = np.concatenate(
-        [data_attribute, additional_attribute], axis=1)
+        [data_attribute, additional_attribute], axis=1) #(num_sample, num_continuous_feature * 2 + num_ori_attribute)
     data_attribute_outputs.extend(additional_attribute_outputs)
 
     return data_feature, data_attribute, data_attribute_outputs, \
@@ -190,6 +142,21 @@ def normalize_per_sample(data_feature, data_attribute, data_feature_outputs,
 
 def add_gen_flag(data_feature, data_gen_flag, data_feature_outputs,
                  sample_len):
+
+    """
+    -adds generation flags to the end of original data features
+    -adds an additional output to the data_feature_outputs list
+    Args:
+    data_feature: original data feature
+    data_gen_flag: original data gen flag
+    data_feature_outputs: list that describes original feature output type, dimension, normalization
+    sample_len: max sequence length of time series
+
+    Returns:
+    data_feature: original data feature + gen flag
+    data_feature_outputs: original data_feature_output + output type, dimension and normalization of gen flag
+    """
+
     for output in data_feature_outputs:
         if output.is_gen_flag:
             raise Exception("is_gen_flag should be False for all"
@@ -204,7 +171,7 @@ def add_gen_flag(data_feature, data_gen_flag, data_feature_outputs,
 
     num_sample, length = data_gen_flag.shape
 
-    data_gen_flag = np.expand_dims(data_gen_flag, 2)
+    data_gen_flag = np.expand_dims(data_gen_flag, 2) # (num_sample, seq_len, 1)
 
     data_feature_outputs.append(Output(
         type_=OutputType.DISCRETE,
@@ -214,20 +181,21 @@ def add_gen_flag(data_feature, data_gen_flag, data_feature_outputs,
     shift_gen_flag = np.concatenate(
         [data_gen_flag[:, 1:, :],
          np.zeros((data_gen_flag.shape[0], 1, 1))],
-        axis=1)
+        axis=1)  # (num_samples, seq_len, 1)
     if length % sample_len != 0:
         raise Exception("length must be a multiple of sample_len")
     data_gen_flag_t = np.reshape(
         data_gen_flag,
-        [num_sample, int(length / sample_len), sample_len])
+        [num_sample, int(length / sample_len), sample_len]) # (num_sample, 1, seq_len)
     data_gen_flag_t = np.sum(data_gen_flag_t, 2)
     data_gen_flag_t = data_gen_flag_t > 0.5
     data_gen_flag_t = np.repeat(data_gen_flag_t, sample_len, axis=1)
     data_gen_flag_t = np.expand_dims(data_gen_flag_t, 2)
+    # add the gen_flag and inverse of gen_flag to data_feature
     data_feature = np.concatenate(
         [data_feature,
          shift_gen_flag,
          (1 - shift_gen_flag) * data_gen_flag_t],
-        axis=2)
+        axis=2) # (num_sample, seq_len, num_features + 2)
 
     return data_feature, data_feature_outputs

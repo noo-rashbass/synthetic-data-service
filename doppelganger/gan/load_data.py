@@ -4,6 +4,9 @@ import pickle
 
 
 def load_data(path, flag="train"):
+    """
+    loads feature, attribute and gen_flag to be fed into the model
+    """
     data_npz = np.load(
         os.path.join(path, "data_{}.npz".format(flag)))
     with open(os.path.join(path, "data_feature_output.pkl"), "rb") as f:
