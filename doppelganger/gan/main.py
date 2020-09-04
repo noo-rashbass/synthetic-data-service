@@ -70,7 +70,8 @@ if __name__ == "__main__":
         num_packing=1,
         attr_discriminator=attrdiscriminator_model,
         attr_d_gp_coe=10., 
-        g_attr_d_coe=1.0)
+        g_attr_d_coe=1.0,
+        cumsum=False)
 
     #combine data attributes and features into one to be fed into the model
     # data_attribute_in = tf.expand_dims(data_attribute, axis=1)

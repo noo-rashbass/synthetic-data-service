@@ -21,7 +21,8 @@ class DoppelGANger(tf.keras.Model):
                  fix_feature_network=False,
                  g_lr=0.001, g_beta1=0.5,
                  d_lr=0.001, d_beta1=0.5,
-                 attr_d_lr=0.001, attr_d_beta1=0.5):
+                 attr_d_lr=0.001, attr_d_beta1=0.5,
+                 cumsum=False):
         super(DoppelGANger, self).__init__()
         self.epoch = epoch
         self.batch_size = batch_size
@@ -50,6 +51,7 @@ class DoppelGANger(tf.keras.Model):
         self.d_beta1 = d_beta1
         self.attr_d_lr = attr_d_lr
         self.attr_d_beta1 = attr_d_beta1
+        self.cumsum = cumsum
 
         self.check_data()
 
@@ -234,6 +236,39 @@ class DoppelGANger(tf.keras.Model):
         slopes2 = tf.math.reduce_sum(tf.math.square(grad[1]), axis=[1])
         slopes = tf.math.sqrt(slopes1 + slopes2 + self.EPS)
         d_loss_gp = tf.math.reduce_mean((slopes - 1.)**2)
+
+        ################ CUM SUM   ###############################################################
+        # This is an attempt to capture bimodal distribution in data columns using cumulative distribution
+        # not sure if it actually works
+        if self.cumsum:
+            batch_data_feature_cum = tf.cast(tf.cumsum(batch_data_feature, axis=1), tf.float32)
+            g_output_feature_train_tf_cum = tf.cumsum(g_output_feature_train_tf, axis=1)
+            batch_data_attribute_cum = tf.cast(tf.cumsum(batch_data_attribute, axis=1), tf.float32)
+            g_output_attribute_train_tf_cum = tf.cumsum(g_output_attribute_train_tf, axis=1)
+
+            alpha_dim4 = tf.random.uniform(shape=[batch_size, 1], minval=0., maxval=1.)
+            alpha_dim5 = tf.expand_dims(alpha_dim2, 2)
+            differences_input_feature_cum = (g_output_feature_train_tf_cum - batch_data_feature_cum)
+            interpolates_input_feature_cum = (batch_data_feature_cum + alpha_dim5 * differences_input_feature_cum)
+            differences_input_attribute_cum = (g_output_attribute_train_tf_cum - batch_data_attribute_cum)
+            interpolates_input_attribute_cum = (batch_data_attribute_cum + (alpha_dim4 * differences_input_attribute_cum))
+            
+            #not sure to use tf.grad or tf.gradtape
+            with tf.GradientTape() as tape2:
+                tape2.watch([interpolates_input_feature_cum, interpolates_input_attribute_cum])
+                predict_cum = self.discriminator([interpolates_input_feature_cum, interpolates_input_attribute_cum])
+
+            # Calculate the gradients w.r.t to this interpolated patient
+            grad_cum = tape2.gradient(predict_cum, [interpolates_input_feature_cum, interpolates_input_attribute_cum])
+
+            slopes1_cum = tf.math.reduce_sum(tf.math.square(grad_cum[0]),axis=[1, 2])
+            slopes2_cum = tf.math.reduce_sum(tf.math.square(grad_cum[1]), axis=[1])
+            slopes_cum = tf.math.sqrt(slopes1_cum + slopes2_cum + self.EPS)
+            d_loss_gp_cum = tf.math.reduce_mean((slopes_cum - 1.)**2)
+        else:
+            d_loss_gp_cum = 0
+
+        ############### END OF CUM SUM   ############################################################
         
         d_loss = (d_loss_fake + d_loss_real + self.d_gp_coe * d_loss_gp)
     
@@ -275,6 +310,33 @@ class DoppelGANger(tf.keras.Model):
             slopes1 = tf.math.reduce_sum(tf.math.square(grad[0]), axis=[1])
             slopes = tf.math.sqrt(slopes1 + self.EPS)
             attr_d_loss_gp = tf.reduce_mean((slopes - 1.)**2)
+
+            ##### CUM SUM #################################################
+            # This is an attempt to capture bimodal distribution in data columns using cumulative distribution
+            # not sure if it actually works
+            if self.cumsum:
+                batch_data_attribute_cum = tf.cast(tf.cumsum(batch_data_attribute, axis=1), tf.float32)
+                g_output_attribute_train_tf_cum = tf.cumsum(g_output_attribute_train_tf, axis=1)
+
+                alpha_dim4 = tf.random.uniform(shape=[batch_size, 1], minval=0., maxval=1.)
+                differences_input_attribute_cum = (g_output_attribute_train_tf_cum - batch_data_attribute_cum)
+                interpolates_input_attribute_cum = (batch_data_attribute_cum + (alpha_dim4 * differences_input_attribute_cum))
+
+                #not sure to use tf.grad or tf.gradtape
+                with tf.GradientTape() as tape2:
+                    tape2.watch(interpolates_input_attribute_cum)
+                    predict_cum = self.attr_discriminator(interpolates_input_attribute_cum)
+
+                # Calculate the gradients w.r.t to this interpolated patient
+                grad_cum = tape2.gradient(predict_cum, [interpolates_input_attribute_cum])
+
+                slopes2_cum = tf.math.reduce_sum(tf.math.square(grad_cum[0]), axis=[1])
+                slopes_cum = tf.math.sqrt(slopes2_cum + self.EPS)
+                attr_d_loss_gp_cum = tf.math.reduce_mean((slopes_cum - 1.)**2)
+            else:
+                attr_d_loss_gp_cum = 0
+            
+            ###### END OF CUM SUM ####################################################
 
             attr_d_loss = (attr_d_loss_fake + attr_d_loss_real + self.attr_d_gp_coe * attr_d_loss_gp)
         
