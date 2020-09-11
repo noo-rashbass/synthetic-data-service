@@ -286,7 +286,7 @@ class DoppelGANger(tf.keras.Model):
 
         ############### END OF CUM SUM   ############################################################
         
-        d_loss = (d_loss_fake + d_loss_real + self.d_gp_coe * d_loss_gp)
+        d_loss = (d_loss_fake + d_loss_real + self.d_gp_coe * (d_loss_gp + d_loss_gp_cum))
     
         return d_loss 
 
@@ -354,7 +354,7 @@ class DoppelGANger(tf.keras.Model):
             
             ###### END OF CUM SUM ####################################################
 
-            attr_d_loss = (attr_d_loss_fake + attr_d_loss_real + self.attr_d_gp_coe * attr_d_loss_gp)
+            attr_d_loss = (attr_d_loss_fake + attr_d_loss_real + self.attr_d_gp_coe * (attr_d_loss_gp + attr_d_loss_gp_cum))
         
         return attr_d_loss 
 
@@ -579,7 +579,7 @@ class DoppelGANger(tf.keras.Model):
             save_path_d = self.d_manager.save()
             save_path_ad = self.ad_manager.save()
 
-            print("d_loss", d_loss, "ad_loss", ad_loss, "g_loss", g_loss)
+            print("d_loss: ", d_loss.numpy(), ", ad_loss: ", ad_loss.numpy(), ", g_loss: ", g_loss.numpy())
             
         return {"d_loss": d_loss, "ad_loss": ad_loss, "g_loss": g_loss}
 
