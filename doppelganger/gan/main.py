@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # data_all_in = tf.cast(tf.concat([data_feature, data_attribute_in], axis=2), dtype=tf.float32)
 
     print("----START TRAINING-----")
-    gan.compile()
+    # gan.compile()
 
     # if any callbacks are needed
     # callback1 = tf.keras.callbacks.EarlyStopping(monitor='d_loss', patience=3)

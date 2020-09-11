@@ -22,6 +22,7 @@ class DoppelGANger(tf.keras.Model):
                  g_lr=0.001, g_beta1=0.5,
                  d_lr=0.001, d_beta1=0.5,
                  attr_d_lr=0.001, attr_d_beta1=0.5,
+                 checkpoints=None,
                  cumsum=False):
         super(DoppelGANger, self).__init__()
         self.epoch = epoch
@@ -52,6 +53,21 @@ class DoppelGANger(tf.keras.Model):
         self.attr_d_lr = attr_d_lr
         self.attr_d_beta1 = attr_d_beta1
         self.cumsum = cumsum
+        self.checkpoints = checkpoints
+
+        # optimizers
+        self.g_op = tf.keras.optimizers.Adam(self.g_lr, self.g_beta1)
+        self.d_op = tf.keras.optimizers.Adam(self.d_lr, self.d_beta1)
+        if self.attr_discriminator is not None:
+            self.attr_d_op = tf.keras.optimizers.Adam(self.attr_d_lr, self.attr_d_beta1)
+        
+        # checkpoints
+        self.d_ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.d_op, net=self.discriminator)
+        self.d_manager = tf.train.CheckpointManager(self.d_ckpt, "tf_ckpts_d", max_to_keep=3)
+        self.ad_ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.attr_d_op, net=self.attr_discriminator)
+        self.ad_manager = tf.train.CheckpointManager(self.ad_ckpt, "tf_ckpts_ad", max_to_keep=3)
+        self.g_ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=self.g_op, net=self.generator)
+        self.g_manager = tf.train.CheckpointManager(self.g_ckpt, "tf_ckpts_g", max_to_keep=3)
 
         self.check_data()
 
@@ -93,7 +109,7 @@ class DoppelGANger(tf.keras.Model):
 
         self.data_gen_flag = np.expand_dims(self.data_gen_flag, 2)
         
-        
+    # this is redundant now   
     def compile(self):
         super(DoppelGANger, self).compile()
         self.g_op = tf.keras.optimizers.Adam(self.g_lr, self.g_beta1)
@@ -478,6 +494,34 @@ class DoppelGANger(tf.keras.Model):
         # data_feature_re = tf.slice(data_all_in, [0,0,0], [-1,-1,num_features]) 
         # print(tf.slice(data_all_in, [0,0,num_features], [-1, 1, -1]))
         # data_attribute_re = tf.squeeze(tf.slice(data_all_in, [0,0,num_features], [-1, 1, -1]), axis=1)
+
+        # definitely not resetting but not sure if it is reloading properly
+        if self.checkpoints == None:
+            #restore from latest checkpoint
+            self.g_ckpt.restore(self.g_manager.latest_checkpoint)
+            if self.g_manager.latest_checkpoint:
+                print("G restored from {}".format(self.g_manager.latest_checkpoint))
+            else:
+                print("G initializing from scratch.")
+
+            self.d_ckpt.restore(self.d_manager.latest_checkpoint)
+            if self.d_manager.latest_checkpoint:
+                print("D restored from {}".format(self.d_manager.latest_checkpoint))
+            else:
+                print("D initializing from scratch.")
+
+            self.ad_ckpt.restore(self.ad_manager.latest_checkpoint)
+            if self.ad_manager.latest_checkpoint:
+                print("AD restored from {}".format(self.ad_manager.latest_checkpoint))
+            else:
+                print("AD initializing from scratch.")
+        else:
+            #restore from specified checkpoints
+            self.g_ckpt.restore(checkpoints[0])
+            self.d_ckpt.restore(checkpoints[1])
+            self.ad_ckpt.restore(checkpoints[2])
+            print("G restored from {}".format(checkpoints[0]))
+            print("D restored from {}".format(checkpoints[1]))
         
         for i in range(self.epoch):
             print("epoch: ", i)
@@ -527,6 +571,13 @@ class DoppelGANger(tf.keras.Model):
                                                     batch_addi_attribute_input_noise,
                                                     batch_feature_input_noise,
                                                     batch_feature_input_data)
+            
+            self.d_ckpt.step.assign_add(1)
+            self.g_ckpt.step.assign_add(1)
+            self.ad_ckpt.step.assign_add(1)
+            save_path_g = self.g_manager.save()
+            save_path_d = self.d_manager.save()
+            save_path_ad = self.ad_manager.save()
 
             print("d_loss", d_loss, "ad_loss", ad_loss, "g_loss", g_loss)
             
