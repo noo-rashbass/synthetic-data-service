@@ -93,7 +93,6 @@ def Scatter_Distance(ori_data, gen_data, syn_name):
     df_cat = pd.DataFrame(v, index = [name_index,cat_index], columns = [syn_name+ ' '+'gen probability',syn_name+' '+'ori probability'])
     df_cat = df_cat.fillna(0)
     display(df_cat)
-    #df_cat.to_csv('csv_results/'+syn_name+'categorical_scatter.csv')
     plt.scatter(df_cat[syn_name+ ' '+'gen probability'],df_cat[syn_name+' '+'ori probability'],c = 'r')
     plt.plot([0,1])
     plt.xlabel('Generated Categorical values')
