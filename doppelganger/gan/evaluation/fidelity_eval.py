@@ -74,7 +74,6 @@ def visualization (ori_data, generated_data, analysis, syn_name):
         plt.title(syn_name+' '+'PCA plot')
         plt.xlabel('x-pca')
         plt.ylabel('y-pca')
-        #plt.savefig('png_files/2.1 tsne/'+syn_name+'_pca'+'.png')
         plt.show()
         
         return pca_results, pca_hat_results
@@ -103,7 +102,6 @@ def visualization (ori_data, generated_data, analysis, syn_name):
         plt.title(syn_name+' '+'t-SNE plot')
         plt.xlabel('x-tsne')
         plt.ylabel('y-tsne')
-        #plt.savefig('png_files/2.1 tsne/'+syn_name+'_tsne'+'.png')
         plt.show()
         
         return tsne_results[:anal_sample_no, :], tsne_results[anal_sample_no:,:]
