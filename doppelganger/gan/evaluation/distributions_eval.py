@@ -5,6 +5,7 @@ from scipy import stats
 from scipy.stats import pearsonr
 from math import sqrt
 from sklearn.metrics import mean_squared_error
+import plotly.graph_objects as go
 
 def Histogram_KSTest(ori_nozero, gen_nozero, syn_name, size=100):
     """
@@ -93,15 +94,22 @@ def Scatter_Distance(ori_data, gen_data, syn_name):
     df_cat = pd.DataFrame(v, index = [name_index,cat_index], columns = [syn_name+ ' '+'gen probability',syn_name+' '+'ori probability'])
     df_cat = df_cat.fillna(0)
     display(df_cat)
-    plt.scatter(df_cat[syn_name+ ' '+'gen probability'],df_cat[syn_name+' '+'ori probability'],c = 'r')
-    plt.plot([0,1])
-    plt.xlabel('Generated Categorical values')
-    plt.ylabel('Original Categorical values')
-    plt.show()
+
+    fig = go.Figure(data=go.Scatter(
+                                x=df_cat[syn_name+' '+'gen probability'],
+                                y=df_cat[syn_name+' '+'ori probability'],
+                                mode='markers',
+                                text=df_cat.index.get_level_values(0),
+                                name='data'))
+    fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode='lines', name='diagonal'))
+    fig.update_layout(xaxis_title="Generated Categorical values",
+                      yaxis_title="Original Categorical values",
+                      title=syn_name)
+    fig.show()
     
     distance = mean_squared_error(df_cat.values[:, 0], df_cat.values[:, 1])
     
-    return distance
+    return distance, df_cat
 
 
 def r_corr_test(df, PTable=False, CoefficientandPtable=False, lower=True ):

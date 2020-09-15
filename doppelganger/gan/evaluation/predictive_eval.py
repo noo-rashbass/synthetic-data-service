@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import tensorflow as tf
+import plotly.graph_objects as go
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -185,13 +186,20 @@ def plot_colmse(colmse_t):
         for j in range(len(models)):
             orid = colmse_t.iloc[j][versions[i], 'ori'].values
             gend = colmse_t.iloc[j][versions[i], 'gen'].values
+
             # plotting log values as there is a big diff in magnitude
-            plt.scatter(np.log(orid), np.log(gend), c='r')
+            fig = go.Figure(data=go.Scatter(
+                                x=np.log(orid),
+                                y=np.log(gend),
+                                mode='markers',
+                                text=colmse_t.columns.unique(level=2).to_list(),
+                                name='data'))
             # plotting the diagonal
-            plt.plot((np.log(min(orid)), np.log(max(orid))), (np.log(min(orid)), np.log(max(orid))))
-            plt.xlabel('log of ori data mse')
-            plt.ylabel('log of gen data mse')
-            plt.show()
+            fig.add_trace(go.Scatter(x=[np.log(min(orid)), np.log(max(orid))], y=[np.log(min(orid)), np.log(max(orid))], mode='lines', name='diagonal'))
+            fig.update_layout(xaxis_title="log of ori data mse",
+                            yaxis_title="log of gen data mse",
+                            title=versions[i]+' '+models[j])
+            fig.show()
 
 
 def get_origen_mse(com_t):
@@ -339,14 +347,22 @@ def Scatter_TSTS_TRTR(E_table):
     l = len(df_dic)
     for n in range(l):
         key = df_dic[n]
-        plt.scatter(E_table[key,'ori MSE'], E_table[key,'gen MSE'], color='r')
         max_v = np.max(E_table[key,'ori MSE'])
-        plt.plot([0,max_v],[0,max_v])
-        plt.xlabel('MSE of original data')
-        plt.ylabel('MSE of generated data')
-        plt.title(key)
-        #plt.savefig('png_files/3.1 DWP/scatter from IIIE Table '+ key+'.png')
-        plt.show()
+
+        #plotting the data points
+        fig = go.Figure(data=go.Scatter(
+                                x=E_table[key,'ori MSE'],
+                                y=E_table[key,'gen MSE'],
+                                mode='markers',
+                                text=E_table.index,
+                                name='data'))
+        # plotting the diagonal
+        fig.add_trace(go.Scatter(x=[0,max_v], y=[0,max_v], mode='lines', name='diagonal'))
+        fig.update_layout(xaxis_title="MSE of original data",
+                        yaxis_title="MSE of generated data",
+                        title=key)
+        #fig.write_image("png_files/3.1 DWP/scatter from IIIE Table '+ key+'.png")
+        fig.show()
 
 
 def SRA_TSTS_TRTR(E_table):
@@ -566,19 +582,39 @@ def plot_TxTx_tpred(TxTx_tpred):
     for i in range(len(versions)):
             orid = TxTx_tpred[versions[i], 'test_loss_trtr']
             gend = TxTx_tpred[versions[i], 'test_loss_tsts']
-            plt.scatter(np.log(orid), np.log(gend), c='r')
-            plt.plot([np.log(min(orid)), np.log(max(orid))], [np.log(min(orid)), np.log(max(orid))])
-            plt.xlabel('log (TRTR test loss)')
-            plt.ylabel('log (TSTS test loss)')
-            plt.show()
+            #plotting the data points
+            fig = go.Figure(data=go.Scatter(x=np.log(orid),
+                                            y=np.log(gend),
+                                            mode='markers',
+                                            text=TxTx_tpred[versions[i], 'y_col'],
+                                            name='data'))
+            # plotting the diagonal
+            fig.add_trace(go.Scatter(x=[np.log(min(orid)), np.log(max(orid))], 
+                                        y=[np.log(min(orid)), np.log(max(orid))], 
+                                        mode='lines', 
+                                        name='diagonal'))
+            fig.update_layout(xaxis_title="log (TRTR test loss)",
+                            yaxis_title="log (TRTR test loss)",
+                            title=versions[i])
+            fig.show()
 
             orid = TxTx_tpred[versions[i], 'test_metric_trtr']
             gend = TxTx_tpred[versions[i], 'test_metric_tsts']
-            plt.scatter(np.log(orid), np.log(gend), c='r')
-            plt.plot([np.log(min(orid)), np.log(max(orid))], [np.log(min(orid)), np.log(max(orid))])
-            plt.xlabel('log (TRTR test metric)')
-            plt.ylabel('log (TSTS test metric)')
-            plt.show()
+            #plotting the data points
+            fig = go.Figure(data=go.Scatter(x=np.log(orid),
+                                            y=np.log(gend),
+                                            mode='markers',
+                                            text=TxTx_tpred[versions[i], 'y_col'],
+                                            name='data'))
+            # plotting the diagonal
+            fig.add_trace(go.Scatter(x=[np.log(min(orid)), np.log(max(orid))], 
+                                        y=[np.log(min(orid)), np.log(max(orid))], 
+                                        mode='lines', 
+                                        name='diagonal'))
+            fig.update_layout(xaxis_title="log (TRTR test metric)",
+                            yaxis_title="log (TRTR test metric)",
+                            title=versions[i])
+            fig.show()
 
 
 def get_TxTx_mse(TxTx_tpred):
