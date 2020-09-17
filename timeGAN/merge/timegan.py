@@ -22,7 +22,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     # Basic Parameters
     no, seq_len, dim = np.asarray(ori_data).shape
-    #no_static, batch_size_static, dim_static =  np.asarray(ori_data_static).shape
+
     # Maximum sequence length and each sequence length
     ori_time, max_seq_len = extract_time(ori_data)
     
@@ -48,10 +48,10 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         - min_val: minimum values (for renormalization)
         - max_val: maximum values (for renormalization)
         """    
-        min_val = np.min(np.min(data, axis = 0), axis = 0)
+        min_val = np.nanmin(np.nanmin(data, axis = 0), axis = 0)
         data = data - min_val
         
-        max_val = np.max(np.max(data, axis = 0), axis = 0)
+        max_val = np.nanmax(np.nanmax(data, axis = 0), axis = 0)
         norm_data = data / (max_val + 1e-7)
         
         return norm_data, min_val, max_val
@@ -67,10 +67,10 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         - min_val: minimum values (for renormalization)
         - max_val: maximum values (for renormalization)
         """    
-        min_val = np.min(data, axis = 0)
+        min_val = np.nanmin(data, axis = 0)
         data = data - min_val
         
-        max_val = np.max(data, axis = 0)
+        max_val = np.nanmax(data, axis = 0)
         norm_data = data / (max_val + 1e-7)
         
         return norm_data, min_val, max_val
@@ -92,18 +92,15 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
     z_dim        = dim
     z_dim_static = dim_static
     gamma        = 1
-    
-    
 
 
     def make_embedder ():
         """Embedding network between original feature space to latent space.
         
-        Args:
+        Args for model:
         - X: input time-series features
-        - T: input time information
         
-        Returns:
+        Model returns:
         - H: embeddings
         """
         embedder_model = tf.keras.Sequential(name='embedder')
@@ -112,25 +109,15 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
             embedder_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         embedder_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
-        
-##        e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers-1)])
-##        embedder_model = tf.keras.Sequential([
-##
-##            rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len,dim)),
-##                                   
-##            tf.keras.layers.RNN(e_cell, return_sequences=True), 
-##                       
-##            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
-##
-##          ])
-
         return embedder_model
 
 
 
     def make_embedder_static ():  
+        """
+        Embedder model for static values
+        """
        
-        
         embedder_model_static = tf.keras.Sequential(name="embedder_static", layers= [
             
         tf.keras.layers.Dense(hidden_dim, input_shape=(dim_static,)),
@@ -146,32 +133,23 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
     def make_recovery ():   
         """Recovery network from latent space to original space.
         
-        Args:
+        Args for model:
         - H: latent representation
-        - T: input time information
         
-        Returns:
+        Model returns:
         - X_tilde: recovered data
-        """     
+        """      
         recovery_model = tf.keras.Sequential(name='recovery')
         for i in range(num_layers):
             recovery_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         recovery_model.add(tf.keras.layers.Dense(dim, activation='sigmoid'))
 
-##        r_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers)])
-##        recovery_model = tf.keras.Sequential([
-##            
-##                        
-##            tf.keras.layers.RNN(r_cell, return_sequences = True),
-##                       
-##            tf.keras.layers.Dense(dim, activation=tf.nn.sigmoid)
-##
-##          ])
-
         return recovery_model
 
     def make_recovery_static ():  
-        
+        """
+        recovery model for static values
+        """
             
         recovery_model_static = tf.keras.Sequential(name="recovery_static", layers= [
             
@@ -188,34 +166,25 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
     def make_generator ():  
         """Generator function: Generate time-series data in latent space.
         
-        Args:
+        Args for model:
         - Z: random variables
-        - T: input time information
         
-        Returns:
+        MOdel returns:
         - E: generated embedding
-        """ 
+        """  
         generator_model = tf.keras.Sequential(name='generator')
         generator_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, dim)))
         for i in range(num_layers-1):
             generator_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         generator_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
 
-##        e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh) for _ in range(num_layers)])
-##        generator_model = tf.keras.Sequential([
-##                                    
-##            tf.keras.layers.RNN(e_cell, return_sequences=True),
-##                       
-##            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
-##
-##          ])
-
 
         return generator_model
 
     def make_generator_static ():  
-       
-       
+        """
+        generator model for static values
+        """
         
         generator_model_static = tf.keras.Sequential(name="generator_static", layers= [
             
@@ -233,57 +202,39 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
     def make_supervisor (): 
         """Generate next sequence using the previous sequence.
         
-        Args:
+        Args for model:
         - H: latent representation
-        - T: input time information
         
-        Returns:
+        Model returns:
         - S: generated sequence based on the latent representations generated by the generator
-        """     
+        """       
         supervisor_model = tf.keras.Sequential(name='supervisor')
         for i in range(num_layers-1):
             supervisor_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim*2)))
         supervisor_model.add(tf.keras.layers.Dense(hidden_dim, activation='sigmoid'))
-
-##        e_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh, input_shape=(seq_len, hidden_dim)) for _ in range(num_layers-1)])
-##        supervisor_model = tf.keras.Sequential([
-##                       
-##            tf.keras.layers.RNN(e_cell, return_sequences=True),
-##                       
-##            tf.keras.layers.Dense(hidden_dim, activation=tf.nn.sigmoid)
-##
-##          ])
 
         return supervisor_model
     
     def make_discriminator ():   
         """Recovery network from latent space to original space.
         
-        Args:
+        Args for model:
         - H: latent representation
-        - T: input time information
         
-        Returns:
-        - X_tilde: recovered data
-        """     
+        Model returns:
+        - Y_hat: classification results between original and synthetic time-series
+        """   
         discriminator_model = tf.keras.Sequential(name='discriminator')
         for i in range(num_layers):
             discriminator_model.add(rnn_cell(module_name, hidden_dim, return_sequences=True, input_shape=(seq_len, hidden_dim)))
         discriminator_model.add(tf.keras.layers.Dense(1, activation=None))
 
-##        d_cell = tf.keras.layers.StackedRNNCells([tf.keras.layers.GRUCell(hidden_dim, activation = tf.nn.tanh) for _ in range(num_layers)])
-##        discriminator_model = tf.keras.Sequential([
-##                       
-##            tf.keras.layers.RNN(d_cell),
-##                       
-##            tf.keras.layers.Dense(1, activation=None)
-##
-##          ])
-
         return discriminator_model
 
     def make_discriminator_static ():  
-       
+        """
+        discirminator model for static values
+        """
         
         discriminator_model_static = tf.keras.Sequential(name="discriminator_static", layers= [
             
@@ -299,8 +250,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
         return discriminator_model_static
     
-
-
+    # make the models
     embedder_model = make_embedder()
     recovery_model = make_recovery()
     generator_model = make_generator()
@@ -325,7 +275,16 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
     
     def get_embedder_loss(X, X_tilde, H, H_hat_supervise):
         """
-        returns embedder network loss
+        computes embedder network loss
+        
+        Args:
+        - X: input time-series features
+        - X_tilde: recovered data
+        - H: latent representation
+        - H_hat_supervise: generated sequence based on the latent representations generated by the generator
+        
+        Returns:
+        - E_loss: embedder loss
         """
         E_loss_T0 = get_embedder_T0_loss(X, X_tilde)
         E_loss0 = 10*tf.sqrt(E_loss_T0) #could use function above
@@ -336,7 +295,14 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     def get_generator_s_loss(H, H_hat_supervise):
         """
-        returns supervised loss
+        computes supervised loss
+
+        Args:
+        - H: latent representation
+        - H_hat_supervise: generated sequence based on the latent representations generated by the generator
+       
+        Returns:
+        - G_loss_s: supervised loss for generator
         """
         mse = tf.keras.losses.MeanSquaredError()
         G_loss_S = mse(H[:,1:,:], H_hat_supervise[:,:-1,:])
@@ -344,7 +310,21 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     def get_generator_loss(Y_fake, Y_fake_e, X_hat, X, H, H_hat_supervise):
         """
-        returns generator loss
+        computes generator loss for time series variables
+
+        Args:
+        - Y_fake: classification results of latent synthetic time-series
+        - Y_fake_e: classification results of generated sequence for latent synthetic time-series
+        - X_hat: recovered data
+        - X: input time-series data
+        - H: latent representation
+        - H_hat_supervise: generated sequence for latent representation
+
+        Returns:
+        - G_loss: generator loss
+        - G_loss_U: unsupervised generator loss
+        - G_loss_S: supervised generator loss
+        - G_loss_V: moments loss for generator
         """
         #1. Adversarial loss
         bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -366,7 +346,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
     
     def get_generator_loss_static(Y_fake_e, X_hat, X):
         """
-        returns generator loss
+        returns generator loss for static values
         """
         #1. Adversarial loss
         bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -385,7 +365,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
     
     def get_generator_loss_both(Y_fake, Y_fake_e, X_hat, X, H, H_hat_supervise, Y_fake_e_static, X_hat_static, X_static):
         """
-        returns generator loss
+        returns generator loss for both static and time series variables
         """
         #1. Adversarial loss
         bce = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -414,7 +394,15 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         
     def get_discriminator_loss(Y_real, Y_fake, Y_fake_e):
         """
-        returns discrminator loss
+        computes discrminator loss for time series variables
+        
+        Args:
+        - Y_real: classification results of latent real time-series
+        - Y_fake: classification results of latent synthetic time-series
+        - Y_fake_e: classification results of generated sequence for latent synthetic time-series
+        
+        Returns:
+        - d_loss: discriminator loss
         """
         bce = tf.keras.losses.BinaryCrossentropy(from_logits=True) #loss for cls of latent real data seq
         #default arg for tf.keras.losses.BinaryCrossentropy reduction=losses_utils.ReductionV2.AUTO
@@ -426,7 +414,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     def get_discriminator_loss_static(Y_real, Y_fake_e):
         """
-        returns discrminator loss
+        returns discrminator loss for static values
         """
         bce = tf.keras.losses.BinaryCrossentropy(from_logits=True) #loss for cls of latent real data seq
         #default arg for tf.keras.losses.BinaryCrossentropy reduction=losses_utils.ReductionV2.AUTO
@@ -469,6 +457,9 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     @tf.function
     def train_step_embedder_static(X_mb):
+        """
+        trains static embedder model
+        """
 
         with tf.GradientTape() as embedder_static_tape:
             # Embedder & Recovery
@@ -485,6 +476,9 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     @tf.function
     def train_step_embedder(X_mb):
+        """
+        trains static embedder model
+        """
 
         with tf.GradientTape() as embedder_tape:
             # Embedder & Recovery
@@ -502,15 +496,17 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     @tf.function
     def train_step_generator_s(X_mb, X_mb_static):
+        """
+        supervised training for generator model
+        """
         
-        with tf.GradientTape() as gen_s_tape: #, tf.GradientTape() as s_tape:
+        with tf.GradientTape() as gen_s_tape:
             
-            H_mb = embedder_model(X_mb) #recall
+            H_mb = embedder_model(X_mb) 
             H_mb_static = embedder_model_static(X_mb_static)
                         
             H_mb_static = tf.expand_dims(H_mb_static, axis=1)
             H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
-            
             
             #Embeddings of both static and temporal features
             H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
@@ -518,82 +514,87 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
             # Generator
             H_hat_supervise_mb = supervisor_model(H_mb_mix)
             
-            gen_s_loss = get_generator_s_loss(H_mb, H_hat_supervise_mb) #hot sure if i should do whole gen loss or only gen_s loss
-            gen_s_vars = supervisor_model.trainable_variables #removed possibly useless generator variables.
-            #vars = [generator_model.trainable_vaiables, supervisor_model.trainable_variables]
+            gen_s_loss = get_generator_s_loss(H_mb, H_hat_supervise_mb) 
+            gen_s_vars = supervisor_model.trainable_variables
             gradients_of_gen_s = gen_s_tape.gradient(gen_s_loss, gen_s_vars)
             gen_s_optimizer.apply_gradients(zip(gradients_of_gen_s, gen_s_vars))
 
           
 
-        return gen_s_loss # E_hat_mb, H_hat_mb, H_hat_supervise_mb,  #,generator_model, supervisor_model
+        return gen_s_loss
 
-    @tf.function
-    def train_step_joint(X_mb, X_mb_static, Z_mb, Z_mb_static):
-        #train generator 
-        with tf.GradientTape() as gen_tape:
+    
+    # @tf.function
+    # def train_step_joint(X_mb, X_mb_static, Z_mb, Z_mb_static):
+    #     """
+    #     joint training for temporal generator and supervisor model, embedder model
+    #     """
+    #     #train generator 
+    #     with tf.GradientTape() as gen_tape:
             
-            #Embeddings
-            H_mb = embedder_model(X_mb) 
-            H_mb_static = embedder_model_static(X_mb_static)
+    #         #Embeddings
+    #         H_mb = embedder_model(X_mb) 
+    #         H_mb_static = embedder_model_static(X_mb_static)
 
-            H_mb_static = tf.expand_dims(H_mb_static, axis=1)
-            H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
+    #         H_mb_static = tf.expand_dims(H_mb_static, axis=1)
+    #         H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
 
-            #Combine static and temporal features
-            H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
+    #         #Combine static and temporal features
+    #         H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
             
-            E_hat_mb = generator_model(Z_mb)
-            E_hat_mb_static = generator_model_static(Z_mb_static)
+    #         E_hat_mb = generator_model(Z_mb)
+    #         E_hat_mb_static = generator_model_static(Z_mb_static)
 
-            E_hat_mb_static = tf.expand_dims(E_hat_mb_static, axis=1)
-            E_hat_mb_static = tf.repeat(E_hat_mb_static, seq_len, axis=1)
+    #         E_hat_mb_static = tf.expand_dims(E_hat_mb_static, axis=1)
+    #         E_hat_mb_static = tf.repeat(E_hat_mb_static, seq_len, axis=1)
 
-            #Combine static generator with temporal generator
-            E_hat_mb_mix = tf.concat([E_hat_mb, E_hat_mb_static], axis=2)
+    #         #Combine static generator with temporal generator
+    #         E_hat_mb_mix = tf.concat([E_hat_mb, E_hat_mb_static], axis=2)
                         
-            H_hat_mb = supervisor_model(E_hat_mb_mix) 
-            H_hat_supervise_mb = supervisor_model(H_mb_mix) 
+    #         H_hat_mb = supervisor_model(E_hat_mb_mix) 
+    #         H_hat_supervise_mb = supervisor_model(H_mb_mix) 
 
-            # Synthetic data
-            X_hat_mb = recovery_model(H_hat_mb)
+    #         # Synthetic data
+    #         X_hat_mb = recovery_model(H_hat_mb)
             
-            # Discriminator
-            Y_fake_mb = discriminator_model(H_hat_mb)
-            Y_fake_e_mb = discriminator_model(E_hat_mb)
+    #         # Discriminator
+    #         Y_fake_mb = discriminator_model(H_hat_mb)
+    #         Y_fake_e_mb = discriminator_model(E_hat_mb)
 
-            gen_loss, g_loss_u, gen_s_loss, g_loss_v = get_generator_loss(Y_fake_mb, Y_fake_e_mb, X_hat_mb, X_mb, H_mb, H_hat_supervise_mb)
-            gen_vars = generator_model.trainable_variables + supervisor_model.trainable_variables
-            gradients_of_gen = gen_tape.gradient(gen_loss, gen_vars)
-            generator_optimizer.apply_gradients(zip(gradients_of_gen, gen_vars))
+    #         gen_loss, g_loss_u, gen_s_loss, g_loss_v = get_generator_loss(Y_fake_mb, Y_fake_e_mb, X_hat_mb, X_mb, H_mb, H_hat_supervise_mb)
+    #         gen_vars = generator_model.trainable_variables + supervisor_model.trainable_variables
+    #         gradients_of_gen = gen_tape.gradient(gen_loss, gen_vars)
+    #         generator_optimizer.apply_gradients(zip(gradients_of_gen, gen_vars))
         
         
-        #train embedder
-        with tf.GradientTape() as embedder_tape:
+    #     #train embedder
+    #     with tf.GradientTape() as embedder_tape:
 
-            H_mb = embedder_model(X_mb) #recall
-            H_mb_static = embedder_model_static(X_mb_static)
+    #         H_mb = embedder_model(X_mb) 
+    #         H_mb_static = embedder_model_static(X_mb_static)
 
-            X_tilde_mb = recovery_model(H_mb) 
+    #         X_tilde_mb = recovery_model(H_mb) 
             
-            H_mb_static = tf.expand_dims(H_mb_static, axis=1)
-            H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
+    #         H_mb_static = tf.expand_dims(H_mb_static, axis=1)
+    #         H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
 
-            H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
-            H_hat_supervise = supervisor_model(H_mb_mix) #called in order to get emb_loss
+    #         H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
+    #         H_hat_supervise = supervisor_model(H_mb_mix) 
             
-            #not sure if this should be E_loss or E_loss_T0 
-            #i think we are minimizing E_loss but printing out E_loss_T0??
-            emb_T0_loss = get_embedder_T0_loss(X_mb, X_tilde_mb)
-            emb_loss = get_embedder_loss(X_mb, X_tilde_mb, H_mb, H_hat_supervise) 
-            emb_vars = embedder_model.trainable_variables + recovery_model.trainable_variables
-            gradients_of_emb = embedder_tape.gradient(emb_loss, emb_vars)
-            embedder_optimizer.apply_gradients(zip(gradients_of_emb, emb_vars))
+
+    #         emb_T0_loss = get_embedder_T0_loss(X_mb, X_tilde_mb)
+    #         emb_loss = get_embedder_loss(X_mb, X_tilde_mb, H_mb, H_hat_supervise) 
+    #         emb_vars = embedder_model.trainable_variables + recovery_model.trainable_variables
+    #         gradients_of_emb = embedder_tape.gradient(emb_loss, emb_vars)
+    #         embedder_optimizer.apply_gradients(zip(gradients_of_emb, emb_vars))
         
-        return emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v #H_hat_mb, E_hat_mb, 
+    #     return emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v  
 
     @tf.function
     def train_step_joint_static(X_mb, X_mb_static, Z_mb):
+        """
+        joint training for static generator and supervisor model, embedder model
+        """
         #train generator ## STATIC Z
         with tf.GradientTape() as gen_tape:
             
@@ -614,7 +615,6 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
             gradients_of_gen = gen_tape.gradient(gen_loss, gen_vars)
             generator_static_optimizer.apply_gradients(zip(gradients_of_gen, gen_vars))
 
-            
         
         #train embedder
         with tf.GradientTape() as embedder_tape:
@@ -624,7 +624,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
             X_tilde_mb = recovery_model_static(H_mb_static) 
                       
             emb_T0_loss = get_embedder_T0_loss(X_mb_static, X_tilde_mb)
-            emb_loss = get_embedder_0_loss(X_mb_static, X_tilde_mb) #Not sure which embedder loss to use
+            emb_loss = get_embedder_0_loss(X_mb_static, X_tilde_mb) 
             emb_vars = embedder_model_static.trainable_variables + recovery_model_static.trainable_variables
             gradients_of_emb = embedder_tape.gradient(emb_loss, emb_vars)
             embedder_static_optimizer.apply_gradients(zip(gradients_of_emb, emb_vars))
@@ -633,6 +633,9 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     @tf.function
     def train_step_joint_both(X_mb, X_mb_static, Z_mb, Z_mb_static):
+        """
+        joint training for both static and temporal generator and supervisor model, embedder model
+        """
         #train generator - temporal + static
         with tf.GradientTape() as gen_tape:
             
@@ -690,10 +693,8 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
             H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
 
             H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
-            H_hat_supervise = supervisor_model(H_mb_mix) #called in order to get emb_loss
-            
-            #not sure if this should be E_loss or E_loss_T0 
-            #i think we are minimizing E_loss but printing out E_loss_T0??
+            H_hat_supervise = supervisor_model(H_mb_mix) 
+
             emb_T0_loss = get_embedder_T0_loss(X_mb, X_tilde_mb)
             emb_loss = get_embedder_loss(X_mb, X_tilde_mb, H_mb, H_hat_supervise) 
             emb_vars = embedder_model.trainable_variables + recovery_model.trainable_variables
@@ -715,53 +716,58 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         
         return emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v, emb_T0_loss_static, g_loss_v_static
 
-    ##CHECK DISCRIM FOR CORRECT PROCESS
-    @tf.function
-    def train_step_discriminator(X_mb, X_mb_static, Z_mb, Z_mb_static):
+
+    # @tf.function
+    # def train_step_discriminator(X_mb, X_mb_static, Z_mb, Z_mb_static):
+    #     """
+    #     trains temporal discriminator model
+    #     """
         
-        with tf.GradientTape() as disc_tape:
+    #     with tf.GradientTape() as disc_tape:
             
-            H_mb = embedder_model(X_mb)
-            H_mb_static = embedder_model_static(X_mb_static)
+    #         H_mb = embedder_model(X_mb)
+    #         H_mb_static = embedder_model_static(X_mb_static)
 
-            H_mb_static = tf.expand_dims(H_mb_static, axis=1)
-            H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
-            H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
+    #         H_mb_static = tf.expand_dims(H_mb_static, axis=1)
+    #         H_mb_static = tf.repeat(H_mb_static, seq_len, axis=1)
+    #         H_mb_mix = tf.concat([H_mb, H_mb_static], axis=2)
 
-            E_hat_mb = generator_model(Z_mb)
-            E_hat_mb_static = generator_model_static(Z_mb_static)
+    #         E_hat_mb = generator_model(Z_mb)
+    #         E_hat_mb_static = generator_model_static(Z_mb_static)
 
-            E_hat_mb_static = tf.expand_dims(E_hat_mb_static, axis=1)
-            E_hat_mb_static = tf.repeat(E_hat_mb_static, seq_len, axis=1)
+    #         E_hat_mb_static = tf.expand_dims(E_hat_mb_static, axis=1)
+    #         E_hat_mb_static = tf.repeat(E_hat_mb_static, seq_len, axis=1)
 
             
-            E_hat_mb_mix = tf.concat([E_hat_mb, E_hat_mb_static], axis=2)
-            H_hat_mb = supervisor_model(E_hat_mb_mix) 
+    #         E_hat_mb_mix = tf.concat([E_hat_mb, E_hat_mb_static], axis=2)
+    #         H_hat_mb = supervisor_model(E_hat_mb_mix) 
             
-            # Synthetic data
-            X_hat_mb = recovery_model(H_hat_mb)
+    #         # Synthetic data
+    #         X_hat_mb = recovery_model(H_hat_mb)
             
-            # Discriminator
-            Y_fake_mb = discriminator_model(H_hat_mb)
-            Y_real_mb = discriminator_model(H_mb)
-            Y_fake_e_mb = discriminator_model(E_hat_mb)
+    #         # Discriminator
+    #         Y_fake_mb = discriminator_model(H_hat_mb)
+    #         Y_real_mb = discriminator_model(H_mb)
+    #         Y_fake_e_mb = discriminator_model(E_hat_mb)
 
-            # Check discriminator loss before updating
-            disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
-            # Train discriminator (only when the discriminator does not work well)
-            if (disc_loss > 0.15):
-                #disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
-                disc_vars = discriminator_model.trainable_variables
-                gradients_of_disc = disc_tape.gradient(disc_loss, disc_vars)
-                discriminator_optimizer.apply_gradients(zip(gradients_of_disc, disc_vars))
+    #         # Check discriminator loss before updating
+    #         disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
+    #         # Train discriminator (only when the discriminator does not work well)
+    #         if (disc_loss > 0.15):
+    #             #disc_loss = get_discriminator_loss(Y_real_mb, Y_fake_mb, Y_fake_e_mb)
+    #             disc_vars = discriminator_model.trainable_variables
+    #             gradients_of_disc = disc_tape.gradient(disc_loss, disc_vars)
+    #             discriminator_optimizer.apply_gradients(zip(gradients_of_disc, disc_vars))
         
-        return disc_loss
+    #     return disc_loss
         
     @tf.function
     def train_step_discriminator_static(X_mb, X_mb_static, Z_mb):
+        """
+        trains static discriminator model
+        """
         
         with tf.GradientTape() as disc_tape:
-            
             
             H_mb_static = embedder_model_static(X_mb_static)
 
@@ -787,6 +793,9 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
 
     @tf.function
     def train_step_discriminator_both(X_mb, X_mb_static, Z_mb, Z_mb_static):
+        """
+        trains both static and temporal discriminator model
+        """
         
         #training discriminator - temporal + static
         with tf.GradientTape() as disc_tape:
@@ -862,7 +871,7 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         
 
         
-        #@. Training only with supervised loss
+        #2. Training only with supervised loss
         print('Start Training with Supervised Loss Only')
 
         for itt in range(iterations):
@@ -901,59 +910,6 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
             #train discriminator
             d_loss, d_loss_static = train_step_discriminator_both(X_mb, X_mb_static, Z_mb, Z_mb_static)
 
-
-        #     # Static
-        #     # Generator training (twice more than discriminator training)
-
-        # for itt in range(iterations):
-            
-        #     for kk in range(2):
-        #         # Set mini-batch
-        #         X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size) 
-        #         # Random vector generation
-        #         Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-        #         # Train generator and embedder
-        #         emb_T0_loss, emb_loss, g_loss_v = train_step_joint_static(X_mb, X_mb_static, Z_mb)
-                
-        #     # Discriminator training        
-        #     # Set mini-batch
-        #     X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)           
-        #     # Random vector generation
-        #     Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-        #     #train discriminator
-        #     d_loss = train_step_discriminator_static(X_mb, X_mb_static, Z_mb)
-
-        #     # Print multiple checkpoints
-        #     if itt % 200 == 0:
-        #         print('step: '+ str(itt) + '/' + str(iterations) + 
-        #             ', d_loss: ' + str(np.round(d_loss,4)) + 
-        #             ', g_loss_v: ' + str(np.round(g_loss_v,4)) + 
-        #             ', e_loss_t0: ' + str(np.round(np.sqrt(emb_T0_loss),4))  )
-                
-       
-        #     #Temporal
-            
-        #     # Generator training (twice more than discriminator training)
-        #     for kk in range(2):
-        #         # Set mini-batch
-        #         X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size) 
-        #         # Random vector generation
-        #         Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
-        #         Z_mb_static = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-        #         # Train generator and embedder
-        #         emb_T0_loss, emb_loss, g_loss_u, gen_s_loss, g_loss_v = train_step_joint(X_mb, X_mb_static, Z_mb, Z_mb_static)
-            
-        #     # Discriminator training        
-        #     # Set mini-batch
-        #     X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)           
-        #     # Random vector generation
-        #     Z_mb = random_generator(batch_size, z_dim, T_mb, max_seq_len)
-        #     Z_mb_static = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-        #     #train discriminator
-        #     d_loss = train_step_discriminator(X_mb, X_mb_static, Z_mb, Z_mb_static)
-
-
-
             # Print multiple checkpoints
             if itt % 200 == 0:
                 print('step: '+ str(itt) + '/' + str(iterations) + 
@@ -964,30 +920,29 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
                     ', e_loss_t0: ' + str(np.round(np.sqrt(emb_T0_loss),4)) +
                     ', d_loss_static: ' + str(np.round(d_loss_static,4)) + 
                     ', g_loss_v_static: ' + str(np.round(g_loss_v_static,4)) )      
-            
-            
         
         print('Finish Joint Training')
-        
         
 
         ## Synthetic data generation
         Z_mb = random_generator(no, z_dim, ori_time, max_seq_len)
         Z_mb_static = random_generator_static(no, z_dim_static, ori_time, max_seq_len)
         
+        # generate in latent dim
         E_hat_generated = generator_model(Z_mb)
         E_hat_generated_static = generator_model_static(Z_mb_static)
 
+        # repeat for seq_len for static values
         E_hat_generated_static_ = tf.expand_dims(E_hat_generated_static, axis=1)
         E_hat_generated_static_ = tf.repeat(E_hat_generated_static_, seq_len, axis=1)
-
         
+        # join static and temporal together
         E_hat_generated_mix = tf.concat([E_hat_generated, E_hat_generated_static_], axis=2)
-
+        
         H_hat_generated = supervisor_model(E_hat_generated_mix)
 
+        # map up to original dimension
         generated_data_curr = recovery_model(H_hat_generated)
-        
         generated_data_curr_static = recovery_model_static(E_hat_generated_static)
         
         generated_data_static = list()
@@ -1000,7 +955,6 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         generated_data_static = generated_data_static * max_val_static
         generated_data_static = generated_data_static + min_val_static
 
-        
         generated_data_seq = np.array([[generated_data_static[i] for _ in range(seq_len)] for i in range(no)])
 
         generated_data = list()
@@ -1017,74 +971,6 @@ def timegan(ori_data, ori_data_static, ori_data_stack, parameters):
         generated_data = np.dstack((generated_data, generated_data_seq))
 
         return generated_data
-    
-    def train_static():
-        #1. Embedding static network training
-        print('Start Static Embedding Network Training')
-
-        for itt in range(iterations):
-            # Set mini-batch
-            _, X_mb_static, _ = batch_generator(ori_data, ori_data_static, ori_time, batch_size)
-            
-            # Train embedder
-            step_e_loss = train_step_embedder_static(X_mb_static)
-           
-            # Checkpoint
-            if itt % 1000 == 0:
-                print('step: '+ str(itt) + '/' + str(iterations) + ', e_loss: ' + str(np.round(np.sqrt(step_e_loss),4)) )
-
-        print('Finish static Embedding Network Training')
-        
-        for itt in range(iterations):
-            # Static
-            # Generator training (twice more than discriminator training)
-            start = time.time()
-            for kk in range(2):
-                # Set mini-batch
-                X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size) 
-                # Random vector generation
-                Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-                # Train generator and embedder
-                emb_T0_loss, emb_loss, g_loss_v = train_step_joint_static(X_mb, X_mb_static, Z_mb)
-                
-            # Discriminator training        
-            # Set mini-batch
-            X_mb, X_mb_static, T_mb = batch_generator(ori_data, ori_data_static, ori_time, batch_size)           
-            # Random vector generation
-            Z_mb = random_generator_static(batch_size, z_dim_static, T_mb, max_seq_len)
-            #train discriminator
-            d_loss = train_step_discriminator_static(X_mb, X_mb_static, Z_mb)
-
-            # Print multiple checkpoints
-            if itt % 200 == 0:
-                print('step: '+ str(itt) + '/' + str(iterations) + 
-                    ', d_loss: ' + str(np.round(d_loss,4)) + 
-                    ', g_loss_v: ' + str(np.round(g_loss_v,4)) + 
-                    ', e_loss_t0: ' + str(np.round(np.sqrt(emb_T0_loss),4))  )
-                end = time.time()
-
-                print("STATIC: ", end-start)
-        
-        Z_mb_static = random_generator_static(no, z_dim_static, ori_time, max_seq_len)
-        
-        
-        E_hat_generated_static = generator_model_static(Z_mb_static)    
-
-        generated_data_curr_static = recovery_model_static(E_hat_generated_static)
-
-        generated_data = list()
-
-        for i in range(no):
-            temp = generated_data_curr_static[i,:]
-            generated_data.append(temp)
-                
-        # Renormalization
-        generated_data = generated_data * max_val_static
-        generated_data = generated_data + min_val_static
-
-        generated_data_seq = np.array([[generated_data[i] for _ in range(seq_len)] for i in range(no)])
-         
-        return generated_data_seq
 
     return train()
 
