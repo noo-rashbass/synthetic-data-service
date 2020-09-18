@@ -37,7 +37,7 @@ def gen_data_loading(path, feature_cols, attribute_cols, min_val, max_val, first
     data_df['id'] = data_df.index // seq_len + 1
 
     # remove padded columns
-    data_df = data_df.drop(data_df[(data_df.weight == 0) & (data_df.height == 0)].index)
+    data_df = data_df.drop(data_df[(data_df.weight == 0) & (data_df.malaria_yes == 0) & (data_df.malaria_no == 0)].index)
     
     #renormalization
     cols_to_renormalize = feature_cols

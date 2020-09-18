@@ -81,7 +81,11 @@ def Scatter_Distance(ori_data, gen_data, syn_name):
     cat_index = []
     for name in cat_keys:
         # use 1 - value_for_0 to get True value (since value for 1 might be NaN)
-        df_1=pd.DataFrame({'gen':1 - CatProportion(gen_data[name])[0],'ori': 1 - CatProportion(ori_data[name])[0]}, index=["True"])
+        try:
+            df_1=pd.DataFrame({'gen':1 - CatProportion(gen_data[name])[0],'ori': 1 - CatProportion(ori_data[name])[0]}, index=["True"])
+        # actually value for 0 might be NaN as well sometimes 
+        except:
+            df_1=pd.DataFrame({'gen':CatProportion(gen_data[name])[1],'ori': CatProportion(ori_data[name])[1]}, index=["True"])
         if first:
             v = df_1.values
             first = False
