@@ -189,15 +189,16 @@ def plot_colmse(colmse_t):
 
             # plotting log values as there is a big diff in magnitude
             fig = go.Figure(data=go.Scatter(
-                                x=np.log(orid),
-                                y=np.log(gend),
+                                x=orid, #np.log(orid),
+                                y=gend, #np.log(gend),
                                 mode='markers',
                                 text=colmse_t.columns.unique(level=2).to_list(),
                                 name='data'))
             # plotting the diagonal
-            fig.add_trace(go.Scatter(x=[np.log(min(orid)), np.log(max(orid))], y=[np.log(min(orid)), np.log(max(orid))], mode='lines', name='diagonal'))
-            fig.update_layout(xaxis_title="log of ori data mse",
-                            yaxis_title="log of gen data mse",
+            # fig.add_trace(go.Scatter(x=[np.log(min(orid)), np.log(max(orid))], y=[np.log(min(orid)), np.log(max(orid))], mode='lines', name='diagonal'))
+            fig.add_trace(go.Scatter(x=[min(orid), max(orid)], y=[min(orid), max(orid)], mode='lines', name='diagonal'))
+            fig.update_layout(xaxis_title="scaled ori data mse",
+                            yaxis_title="scaled gen data mse",
                             title=versions[i]+' '+models[j])
             fig.show()
 
@@ -583,36 +584,40 @@ def plot_TxTx_tpred(TxTx_tpred):
             orid = TxTx_tpred[versions[i], 'test_loss_trtr']
             gend = TxTx_tpred[versions[i], 'test_loss_tsts']
             #plotting the data points
-            fig = go.Figure(data=go.Scatter(x=np.log(orid),
-                                            y=np.log(gend),
+            fig = go.Figure(data=go.Scatter(x=orid, #np.log(orid),
+                                            y=gend, #np.log(gend),
                                             mode='markers',
                                             text=TxTx_tpred[versions[i], 'y_col'],
                                             name='data'))
             # plotting the diagonal
-            fig.add_trace(go.Scatter(x=[np.log(min(orid)), np.log(max(orid))], 
-                                        y=[np.log(min(orid)), np.log(max(orid))], 
+            fig.add_trace(go.Scatter(x=[min(orid), max(orid)],
+                                        y=[min(orid), max(orid)],
+                                        #x=[np.log(min(orid)), np.log(max(orid))], 
+                                        #y=[np.log(min(orid)), np.log(max(orid))], 
                                         mode='lines', 
                                         name='diagonal'))
-            fig.update_layout(xaxis_title="log (TRTR test loss)",
-                            yaxis_title="log (TRTR test loss)",
+            fig.update_layout(xaxis_title="scaled TRTR test loss",
+                            yaxis_title="scaled TRTR test loss",
                             title=versions[i])
             fig.show()
 
             orid = TxTx_tpred[versions[i], 'test_metric_trtr']
             gend = TxTx_tpred[versions[i], 'test_metric_tsts']
             #plotting the data points
-            fig = go.Figure(data=go.Scatter(x=np.log(orid),
-                                            y=np.log(gend),
+            fig = go.Figure(data=go.Scatter(x=orid, #np.log(orid),
+                                            y=gend, #np.log(gend),
                                             mode='markers',
                                             text=TxTx_tpred[versions[i], 'y_col'],
                                             name='data'))
             # plotting the diagonal
-            fig.add_trace(go.Scatter(x=[np.log(min(orid)), np.log(max(orid))], 
-                                        y=[np.log(min(orid)), np.log(max(orid))], 
+            fig.add_trace(go.Scatter(x=[min(orid), max(orid)],
+                                        y=[min(orid), max(orid)],
+                                        #x=[np.log(min(orid)), np.log(max(orid))], 
+                                        #y=[np.log(min(orid)), np.log(max(orid))], 
                                         mode='lines', 
                                         name='diagonal'))
-            fig.update_layout(xaxis_title="log (TRTR test metric)",
-                            yaxis_title="log (TRTR test metric)",
+            fig.update_layout(xaxis_title="scaled TRTR test metric",
+                            yaxis_title="scaled TRTR test metric",
                             title=versions[i])
             fig.show()
 
