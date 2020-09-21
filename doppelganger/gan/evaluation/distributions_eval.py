@@ -29,13 +29,36 @@ def Histogram_KSTest(ori_nozero, gen_nozero, syn_name, size=100):
     p_value = np.zeros(n)
     for num in range(n):
         name = keys[num]
+        # ser_ori = ori_nozero[name].values[:l]
+        # ser_gen = gen_nozero[name].values[:l]
+        # df= pd.DataFrame({'ori':ser_ori, 'gen':ser_gen})
+        # df.plot.hist(bins=100, alpha=0.5, cumulative=False)
+        # plt.title(syn_name+' '+name+'_pdf')
+        # df.plot.hist(bins=100, alpha=0.5, cumulative=True, histtype='step')
+        # plt.title(syn_name+' '+name+'_cdf')
+        # plt.show()
+    
+        fig, ax = plt.subplots()
+        # bootstrap, sample ori with replacemment and plot it
+        for i in range(999):
+            ser_ori = ori_nozero[name].sample(n=l, replace=True).values
+            ax.hist(ser_ori, bins=100, alpha=0.5, cumulative=False, histtype='step', color='skyblue')
+        ser_ori = ori_nozero[name].sample(n=l, replace=False).values
+        ax.hist(ser_ori, bins=100, alpha=0.9, cumulative=False, histtype='step', color='deepskyblue', label='ori')
+        # hist for generated data
+        # hist is used instead of pdf as there was a linear alg error with some columns
+        ser_gen = gen_nozero[name].sample(n=l, replace=True).values
+        ax.hist(ser_gen, bins=100, alpha=1, cumulative=False, histtype='step', color='red', label='gen')
+        plt.title(syn_name+' '+name+'_pdf')
+        plt.legend()
+        plt.show()
+
         ser_ori = ori_nozero[name].values[:l]
         ser_gen = gen_nozero[name].values[:l]
         df= pd.DataFrame({'ori':ser_ori, 'gen':ser_gen})
-        df.plot.hist(bins=100, alpha=0.5, cumulative=False)
-        plt.title(syn_name+' '+name+'_pdf')
         df.plot.hist(bins=100, alpha=0.5, cumulative=True, histtype='step')
         plt.title(syn_name+' '+name+'_cdf')
+        plt.legend()
         plt.show()
 
         value = [0,0]
@@ -56,6 +79,75 @@ def Histogram_KSTest(ori_nozero, gen_nozero, syn_name, size=100):
         #the null hypothesis is more likely to be rejected.
     p_series = pd.Series(p_value, index = keys)
     return p_series
+
+
+
+def cat_col_distribution(synthetic_cat_dic):
+    """
+    compares the dsitrbution of categorical columns in real and generated data
+
+    """
+
+    versions = list(synthetic_cat_dic.keys())
+
+    cat_cols = ['complicated_malaria', 'febrile', 'ITN', 'malaria_parasite', 'malaria_treatment', 'plasmodium_gametocytes', 'plasmodium_lamp', 'visit_type']
+
+    # loop through different versions of 
+    for v in versions:
+        ori_cat = synthetic_cat_dic[v][0]
+        gen_cat = synthetic_cat_dic[v][1]
+        # for each categorical data
+        for j, cat_col in enumerate(cat_cols):
+            # get the one hot encoded columns for that category
+            related_cols = [col for col in ori_cat if col.startswith(cat_cols[j])]
+
+            # get bar height
+            expected = ori_cat[related_cols].sum()/len(ori_cat)
+            observed = gen_cat[related_cols].sum()/len(gen_cat)
+
+            # q for error bar
+            q = 1 - expected
+            # error bar - std dev
+            error_bar = np.sqrt(expected * q/ len(ori_cat))
+
+            #indices for location of bar chart
+            indices = range(len(related_cols))
+            width = np.min(np.diff(indices))/3.
+
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+            plt.bar(indices-width/2, expected.values, width, yerr=1.96*error_bar, label='real')
+            plt.bar(indices+width/2, observed.values, width, label='synthetic')
+            plt.xticks(indices, related_cols, rotation=90)
+            plt.ylabel("proprtion")
+            plt.title(v + ' ' + cat_cols[j])
+            plt.legend()
+            plt.show()
+
+        # do separately for malaria. Coz columns that start with malaria_ includes malaria_parasite and malaria_treatment
+        # which messes things up
+        expected = ori_cat[['malaria_yes', 'malaria_no']].sum()/len(ori_cat)
+        observed = gen_cat[['malaria_yes', 'malaria_no']].sum()/len(gen_cat)
+
+        # q for error bar
+        q = 1 - expected
+        # error bar
+        error_bar = np.sqrt(expected * q/ len(ori_cat))
+
+        #indices for location of bar chart
+        indices = range(2)
+        width = np.min(np.diff(indices))/3.
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        plt.bar(indices-width/2, expected.values, width, yerr=1.96*error_bar, label='real')
+        plt.bar(indices+width/2, observed.values, width, label='synthetic')
+        plt.xticks(indices, ['malaria_yes', 'malaria_no'])
+        plt.ylabel("proprtion")
+        plt.title(v + ' Malaria')
+        plt.legend()
+        plt.show()
+
 
 def Scatter_Distance(ori_data, gen_data, syn_name):
     """
@@ -177,6 +269,32 @@ def r_corr_test(df, PTable=False, CoefficientandPtable=False, lower=True ):
         return coe_and_p_table
     else:
         return coefficient_table
+
+
+def hyp_test_mean_mse(MSE_df):
+    """
+    performs hypothesis testing to see if the mean MSE is zero
+    bootstrapping is used to get the mean and std dev of MSEs
+    Larger p-value means null hypothesis (mean MSE=0) is accepted.
+
+    Args:
+    MSE_df: df with MSE values
+    Returns:
+    p_val: p-value from the hypothesis test
+    """
+    # get mse values
+    mses = MSE_df.unstack().reset_index(drop=True)
+    mse_list = []
+    # resample with replacement
+    for i in range(1000):
+        mse_val = mses.sample(frac=1, replace=True).mean()
+        mse_list.append(mse_val)
+    mse_mean = np.mean(mse_list)
+    mse_std = np.std(mse_list)
+    #calculate z-value
+    z = mse_mean/ mse_std
+    p_val = stats.norm.sf(abs(z))*2
+    return p_val
 
 
 def SRA(R, S):
