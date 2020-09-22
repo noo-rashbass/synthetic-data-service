@@ -3,17 +3,54 @@ from util import *
 import tensorflow as tf
 import numpy as np
 import os
+import argparse
 
 from network import make_discriminator, make_attrdiscriminator
 from networkGenerator import DoppelGANgerGenerator
 from doppelganger import DoppelGANger
 
+
 if __name__ == "__main__":
-    seq_len = 130
-    batch_size = 64
-    epochs = 2
-    total_generate_num_sample = 1347
-    path_to_data = "data"
+
+    # Inputs for the main function
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--seq_len',
+        default=130,
+        type=int)
+    parser.add_argument(
+        '--batch_size',
+        help='the number of samples in mini-batch',
+        default=64,
+        type=int)
+    parser.add_argument(
+        '--epochs',
+        help='Training epochs (should be optimized)',
+        default=2,
+        type=int)
+    parser.add_argument(
+        '--total_generate_num_sample',
+        help='total number of samples to generate',
+        default=1347,
+        type=int)
+    parser.add_argument(
+        '--path_to_data',
+        help='path to the pkl and npz files',
+        default='data',
+        type=str)
+    parser.add_argument(
+        '--output_path',
+        help='path the generated file should be saved',
+        default="generated_data_train.npz",
+        type=str)
+    args = parser.parse_args()
+
+    seq_len = args.seq_len
+    batch_size = args.batch_size
+    epochs = args.epochs
+    total_generate_num_sample = args.total_generate_num_sample
+    path_to_data = args.path_to_data
+    output_path = args.output_path
 
     (data_feature, data_attribute, data_gen_flag, data_feature_outputs, data_attribute_outputs) = load_data(path_to_data)
 
@@ -118,7 +155,7 @@ if __name__ == "__main__":
     print(attributes.shape)
 
     np.savez(
-            "generated_data_train.npz",
+            output_path,
             data_feature=features,
             data_attribute=attributes,
             data_gen_flag=gen_flags)
