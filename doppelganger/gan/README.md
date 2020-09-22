@@ -46,11 +46,28 @@ data_gen_flag = [
 	[1.0, 1.0, 1.0, 1.0]]
 ```
 
-## Run DoppelGANger
+## Generating Synthetic Data  
+
+A walkthrough of how synthetic data is generated is shown in the notebook `walkthrough_prism.ipynb`. It shows the complete steps starting from data cleaning, saving the data in the required format to loading in the generated data and converting it back to a `csv` format.
+
+### Sample Data
+Sets of sampled data are shown in `data` and `data_attr`. The original dataset `isaFull.tsv` is first cleaned to `ori_prism_cleaned.csv`.
+
+### Data preparation
+Code for data cleaning and preparation can be found in the `prism_prep` folder. `ori_prism_cleaned.csv` is transformed to the `pkl` and `npz` files.
+
 ### Train and Generate Data with DoppelGANger
+Run `main.py` to generate synthetic data. Change the number of epochs, data path accordingly. Path to data should contain the `pkl` and `npz` files.
 ```
 cd gan
 python main.py
 ```
+The GAN then outputs a `npz` file.
+
+### Evaluating Synthetic Data
+The `evaluations` folder contains the code for evaluating synthetic data generated. A sample of how the evaluation methods are used to assess the distribution, fidelity and usefulness of the synthetic data are shown in `prism_evaltest.ipynb`. The output from the GAN is converted to `gen_orism_int_xx.csv` which is used for evaluation purposes.
+
+### Sample Output
+The intermediate csv from above is then converted to `gen_prism_final_xx.csv` as the final form of output. This csv has the same column names (for the columns that are selected) and format as the original dataset given initially.
 
 TODO: Add license
