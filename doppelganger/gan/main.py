@@ -9,41 +9,7 @@ from network import make_discriminator, make_attrdiscriminator
 from networkGenerator import DoppelGANgerGenerator
 from doppelganger import DoppelGANger
 
-
-if __name__ == "__main__":
-
-    # Inputs for the main function
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--seq_len',
-        default=130,
-        type=int)
-    parser.add_argument(
-        '--batch_size',
-        help='the number of samples in mini-batch',
-        default=64,
-        type=int)
-    parser.add_argument(
-        '--epochs',
-        help='Training epochs (should be optimized)',
-        default=2,
-        type=int)
-    parser.add_argument(
-        '--total_generate_num_sample',
-        help='total number of samples to generate',
-        default=1347,
-        type=int)
-    parser.add_argument(
-        '--path_to_data',
-        help='path to the pkl and npz files',
-        default='data',
-        type=str)
-    parser.add_argument(
-        '--output_path',
-        help='path the generated file should be saved',
-        default="generated_data_train.npz",
-        type=str)
-    args = parser.parse_args()
+def train(args):
 
     seq_len = args.seq_len
     batch_size = args.batch_size
@@ -161,3 +127,40 @@ if __name__ == "__main__":
             data_gen_flag=gen_flags)
 
     print("Done")
+
+if __name__ == "__main__":
+
+    # Inputs for the main function
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--seq_len',
+        default=130,
+        type=int)
+    parser.add_argument(
+        '--batch_size',
+        help='the number of samples in mini-batch',
+        default=64,
+        type=int)
+    parser.add_argument(
+        '--epochs',
+        help='Training epochs (should be optimized)',
+        default=2,
+        type=int)
+    parser.add_argument(
+        '--total_generate_num_sample',
+        help='total number of samples to generate',
+        default=1347,
+        type=int)
+    parser.add_argument(
+        '--path_to_data',
+        help='path to the pkl and npz files',
+        default='data',
+        type=str)
+    parser.add_argument(
+        '--output_path',
+        help='path the generated file should be saved',
+        default="generated_data_train.npz",
+        type=str)
+    args = parser.parse_args()
+
+    train(args)
