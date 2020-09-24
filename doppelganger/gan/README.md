@@ -57,11 +57,14 @@ Sets of sampled data are shown in `data` and `data_attr`. The original dataset `
 Code for data cleaning and preparation can be found in the `prism_prep` folder. `ori_prism_cleaned.csv` is transformed to the `pkl` and `npz` files.
 
 ### Train and Generate Data with DoppelGANger
-Run `main.py` to generate synthetic data. Change the number of epochs, data path accordingly. Path to data should contain the `pkl` and `npz` files.
+Run `main.py` to generate synthetic data. There are a few optional command line arguments, which is the time-series sequence length, batch size, number of epochs, total samples to be generated, path to data and output path.
+
+Example command: 
 ```
 cd gan
-python main.py
+python main.py --seq_len 130 --batch_size 64 --epochs 100 --total_generate_num_sample 1347 --path_to_data "data" --output_path "generated_data.npz"
 ```
+To view command usage help, type in `python main.py --help`
 The GAN then outputs a `npz` file.
 
 ### Evaluating Synthetic Data
