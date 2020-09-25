@@ -8,9 +8,11 @@ class ForbidFilesHandler(IPythonHandler):
   @web.authenticated
   def head(self, path):
     self.log.info("HEAD: File download forbidden.")
-    raise web.HTTPError(403)
+    #raise web.HTTPError(403)
+    return None 
 
   @web.authenticated
   def get(self, path, include_body=True):
     self.log.info("GET: File download forbidden.")
-    raise web.HTTPError(403)
+    #raise web.HTTPError(403)
+    return None 
