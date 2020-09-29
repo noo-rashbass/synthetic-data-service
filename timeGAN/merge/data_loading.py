@@ -76,6 +76,73 @@ def sine_data_generation (no, seq_len, dim):
     data.append(temp)
                 
   return data
+
+  
+
+def sine_data_generation_static(no, seq_len, dim):
+  # Initialize the output
+  data = list()
+  for i in range(no):      
+    # Initialize each time-series
+    temp = list()
+    # For each feature
+    for k in range(dim):
+      x = np.random.normal(0.5, 0.25, 1)            
+      # Generate sine signal based on the drawn frequency and phase
+      temp_data = [x for _ in range(seq_len)] 
+      temp.append(temp_data)
+        
+    # Align row/column
+    temp = np.transpose(np.asarray(temp))
+          
+    # Normalize to [0,1]
+    temp = (temp + 1)*0.5
+    # Stack the generated data
+    data.append(temp)
+                
+  return data
+
+
+def sine_data_generation_mix(no, seq_len, dim):
+  # Initialize the output
+  data = list()
+  data_static = list()
+  data_static_new = list()
+  # Generate sine data
+  for i in range(no):      
+    # Initialize each time-series
+    temp = list()
+    temp_static = list()
+    temp_static_new = list()
+    # For each feature
+    
+    for k in range(dim):
+      freq = np.random.uniform(0, 0.1)            
+      phase = np.random.uniform(0, 0.1)
+      temp_data = [np.sin(freq * j + phase) for j in range(seq_len)] 
+      temp.append(temp_data)
+    temp_data = [freq for _ in range(seq_len)]
+    temp_static.append(temp_data)
+    temp_data = [phase for _ in range(seq_len)]
+    temp_static.append(temp_data)
+
+    temp_data_new = freq
+    temp_static_new.append(temp_data_new)
+    temp_data_new = phase
+    temp_static_new.append(temp_data_new)
+
+
+    # Align row/column
+    temp = np.transpose(np.asarray(temp)) 
+    temp_static = np.transpose(np.asarray(temp_static))
+    temp_static_new = np.transpose(np.asarray(temp_static_new))
+
+    # Stack the generated data
+    data.append(temp)
+    data_static.append(temp_static)     
+    data_static_new.append(temp_static_new)       
+  return data, data_static, data_static_new
+      
     
 
 def real_data_loading (data_name, seq_len):
