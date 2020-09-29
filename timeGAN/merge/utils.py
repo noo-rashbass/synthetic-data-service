@@ -124,7 +124,7 @@ def random_generator_static (batch_size, z_dim, T_mb, max_seq_len):
   return np.array(Z_mb)
 
 
-def batch_generator(data, data_static, time, batch_size):
+def batch_generator_with_static(data, data_static, time, batch_size):
   """Mini-batch generator.
   
   Args:

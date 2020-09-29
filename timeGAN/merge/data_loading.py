@@ -142,12 +142,6 @@ def sine_data_generation_mix(no, seq_len, dim):
     data_static_new.append(temp_static_new)       
   return data, data_static, data_static_new
       
-      
-          
-      
-      
-      
-  
     
 
 def real_data_loading (data_name, seq_len):

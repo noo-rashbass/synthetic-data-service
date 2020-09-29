@@ -10,7 +10,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # 1. TimeGAN model
-from timegan import timegan
+from timegan_static import timegan_static
 # 2. Data loading
 from data_loading import real_data_loading, sine_data_generation, sine_data_generation_static, sine_data_generation_mix
 # 3. Metrics
@@ -59,8 +59,11 @@ def main (args):
     parameters['num_layer'] = args.num_layer
     parameters['iterations'] = args.iteration
     parameters['batch_size'] = args.batch_size
-        
-    generated_data = timegan(ori_data, ori_data_s, ori_data_static, parameters)   
+    
+    if args.data_name == 'normal':
+        generated_data = timegan_static(ori_data, ori_data_s, ori_data_static, parameters)   
+    else:
+        generated_data = timegan(ori_data, parameters) 
     print('Finish Synthetic Data Generation')
     
     """
@@ -101,8 +104,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--data_name',
-        choices=['sine','stock','energy'],
-        default='normal',
+        choices=['sine','stock','energy', 'normal'], #choose normal to work with static data
+        default='sine',
         type=str)
     parser.add_argument(
         '--seq_len',
