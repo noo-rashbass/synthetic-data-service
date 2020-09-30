@@ -28,6 +28,8 @@ python main_timegan.py --data_name prism --seq_len 10 --module gru --hidden_dim 
 
 `timegan_padding.py` is a version of timegan that runs with imputed prism data (dates where patients did not make a visit are imputed and these rows are masked when fed into the model). It works with `500_imputed_patients.csv`. `timegan_padding.py` currently cannot be run through `main_timegan.py`.
 
+`timegan_static.py` is a version of timegan that runs with both static and temporal data. It has not been tested on prism data but only with sine data (temporal- sine values, static- frequency, phase).
+
 TODO: Add reference
 
 
